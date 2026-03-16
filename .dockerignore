@@ -1,0 +1,13 @@
+.git
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.env
+*.log
+logs/
+qdrant_storage/
+pg_data/
+redis_data/
+chroma_data/
+/mnt/

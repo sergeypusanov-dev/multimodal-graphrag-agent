@@ -1,0 +1,247 @@
+# config.yaml — единый файл конфигурации всей системы
+
+# ═══════════════════════════════════════════════════════
+# KNOWLEDGE BASE
+# ═══════════════════════════════════════════════════════
+knowledge_base:
+  # WSL2: НЕ используй /mnt/c/... — медленно!
+  # Правильно: ~/data/knowledge
+  watch_folder: "~/data/knowledge"
+  sync_schedule: "0 */2 * * *"       # каждые 2 часа
+  supported_formats:
+    text:  [".txt",".md",".rst",".html",".pdf",".docx",".csv",".json"]
+    image: [".jpg",".jpeg",".png",".gif",".webp",".bmp",".svg"]
+    audio: [".mp3",".wav",".m4a",".ogg",".flac",".aac"]
+    video: [".mp4",".avi",".mov",".mkv",".webm",".m4v"]
+  chunk_size: 600
+  chunk_overlap: 150
+  max_file_size_mb: 500
+  default_date_precision: "month"
+  community_detection: "leiden"
+  graph_hop_depth: 2
+
+# ═══════════════════════════════════════════════════════
+# LLM PROVIDERS
+# ═══════════════════════════════════════════════════════
+llm:
+  main:
+    provider: "ollama"                # anthropic|openai|gemini|ollama
+    model: "qwen2.5:14b"
+    base_url: "http://ollama:11434/v1"
+    api_key_env: ""
+    max_tokens: 4096
+    temperature: 0.1
+    timeout_sec: 120
+  batch:
+    provider: "ollama"
+    model: "qwen2.5:7b"
+    base_url: "http://ollama:11434/v1"
+    api_key_env: ""
+    max_tokens: 1024
+    temperature: 0.0
+    timeout_sec: 30
+  vision:
+    provider: "ollama"
+    model: "llama3.2-vision"
+    base_url: "http://ollama:11434/v1"
+    api_key_env: ""
+    max_tokens: 512
+    temperature: 0.0
+  fallback:
+    enabled: false
+    provider: "ollama"
+    model: "qwen2.5:7b"
+    base_url: "http://ollama:11434/v1"
+    api_key_env: ""
+    max_tokens: 2048
+    temperature: 0.1
+
+# ═══════════════════════════════════════════════════════
+# EMBEDDINGS
+# ═══════════════════════════════════════════════════════
+embeddings:
+  provider: "ollama"      # gemini|openai|cohere|voyage|local|ollama
+  gemini:
+    model: "gemini-embedding-exp-03-07"
+    api_key_env: "GEMINI_API_KEY"
+    dimensions: 3072
+    task_types:
+      document: "RETRIEVAL_DOCUMENT"
+      query:    "RETRIEVAL_QUERY"
+    batch_size: 100
+  openai:
+    model: "text-embedding-3-large"
+    api_key_env: "OPENAI_API_KEY"
+    dimensions: 3072
+    batch_size: 100
+  cohere:
+    model: "embed-multilingual-v3.0"
+    api_key_env: "COHERE_API_KEY"
+    dimensions: 1024
+    input_types:
+      document: "search_document"
+      query:    "search_query"
+    batch_size: 96
+  local:
+    model: "BAAI/bge-m3"
+    device: "cpu"                     # cpu|cuda|mps
+    dimensions: 1024
+    batch_size: 32
+    normalize: true
+  ollama:
+    model: "nomic-embed-text"
+    base_url: "http://ollama:11434"
+    dimensions: 768
+    batch_size: 64
+
+# ═══════════════════════════════════════════════════════
+# VECTOR STORE
+# ═══════════════════════════════════════════════════════
+vector_store:
+  provider: "qdrant"      # qdrant|pgvector|pinecone|weaviate|chroma|milvus
+  collection_name: "knowledge_base"
+  distance: "Cosine"
+  qdrant:
+    host: "qdrant"                    # Docker: qdrant, Local: localhost
+    port: 6333
+    grpc_port: 6334
+    prefer_grpc: true
+    api_key_env: ""
+    timeout: 30
+  pgvector:
+    url_env: "POSTGRES_URL"
+    table_name: "embeddings"
+    index_type: "ivfflat"
+    ivfflat_lists: 100
+  pinecone:
+    api_key_env: "PINECONE_API_KEY"
+    index_name: "knowledge-base"
+    serverless: true
+    cloud: "aws"
+    region: "us-east-1"
+  weaviate:
+    url: "http://localhost:8080"
+    api_key_env: ""
+    class_name: "KnowledgeChunk"
+  chroma:
+    host: "localhost"
+    port: 8002
+    collection_name: "knowledge_base"
+  milvus:
+    host: "localhost"
+    port: 19530
+    collection_name: "knowledge_base"
+
+# ═══════════════════════════════════════════════════════
+# A2A PROTOCOL
+# ═══════════════════════════════════════════════════════
+a2a:
+  enabled: true
+  agent_id: "multimodal-graphrag-agent"
+  agent_name: "Multimodal Temporal GraphRAG Agent"
+  agent_version: "1.0.0"
+  agent_url: "http://localhost:8000"
+  description: "Multimodal knowledge agent with temporal GraphRAG"
+  auth:
+    enabled: true
+    type: "api_key"
+    api_key_env: "A2A_API_KEY"
+  capabilities:
+    streaming: true
+    push_notifications: false
+    state_transition_history: true
+  skills:
+    - id: "knowledge_search"
+      name: "Knowledge base search"
+      description: "Search temporal GraphRAG knowledge base"
+      input_modes:  ["text","image","audio","video"]
+      output_modes: ["text","file"]
+      tags: ["rag","search","temporal","multimodal"]
+    - id: "document_indexing"
+      name: "Document indexing"
+      description: "Index documents into knowledge graph"
+      input_modes:  ["text","file"]
+      output_modes: ["text"]
+      tags: ["indexing","knowledge-graph"]
+    - id: "entity_analysis"
+      name: "Entity timeline analysis"
+      description: "Analyze entity evolution over time"
+      input_modes:  ["text"]
+      output_modes: ["text","data"]
+      tags: ["temporal","graphrag","analysis"]
+  registry:
+    enabled: true
+    url: "http://localhost:8888"
+    heartbeat_interval_sec: 30
+    peer_agents:
+      - url: "http://analytics-agent:8001"
+        name: "DataAnalyst"
+      - url: "http://translator-agent:8002"
+        name: "Translator"
+
+# ═══════════════════════════════════════════════════════
+# DATABASES
+# ═══════════════════════════════════════════════════════
+databases:
+  postgres:
+    url_env: "POSTGRES_URL"
+    pool_size: 10
+    max_overflow: 20
+  redis:
+    url_env: "REDIS_URL"
+    cache_ttl_sec: 3600
+
+# ═══════════════════════════════════════════════════════
+# MEDIA PROCESSING
+# ═══════════════════════════════════════════════════════
+media_processing:
+  transcription_provider: "local"     # openai|local (local = faster-whisper)
+  whisper_model: "base"               # tiny|base|small|medium|large-v3
+  whisper_device: "cpu"               # cpu|cuda
+  video_frames_per_minute: 4
+  video_max_frames: 30
+  image_description_model: "llama3.2-vision"
+
+# ═══════════════════════════════════════════════════════
+# SECURITY
+# ═══════════════════════════════════════════════════════
+security:
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    burst: 20
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    recovery_timeout_sec: 60
+  input_sanitization:
+    max_text_length: 50000
+    strip_html: true
+
+# ═══════════════════════════════════════════════════════
+# CACHING
+# ═══════════════════════════════════════════════════════
+cache:
+  semantic_cache:
+    enabled: true
+    similarity_threshold: 0.95
+    ttl_sec: 3600
+  embedding_cache:
+    enabled: true
+    ttl_sec: 86400
+  graph_traversal_cache:
+    enabled: true
+    ttl_sec: 300
+
+# ═══════════════════════════════════════════════════════
+# OBSERVABILITY
+# ═══════════════════════════════════════════════════════
+observability:
+  langsmith:
+    project: "multimodal-graphrag-agent"
+    tracing_enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+  log_level: "INFO"
+  cost_tracking: true
