@@ -52,7 +52,7 @@ def _transcribe_local(file_path: str, config: dict) -> dict:
     device = config.get("media_processing", {}).get("whisper_device", "cpu")
     compute_type = "int8" if device == "cpu" else "float16"
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
-    result_segments, info = model.transcribe(file_path, beam_size=5)
+    result_segments, info = model.transcribe(file_path, beam_size=5, language=None)
     segments = []
     texts = []
     for seg in result_segments:

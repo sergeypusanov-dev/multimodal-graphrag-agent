@@ -78,6 +78,7 @@ services:
   agent:
     build: {context: ., dockerfile: Dockerfile}
     container_name: agent-api
+    dns: ["8.8.8.8", "8.8.4.4"]
     ports: ["8100:8000","9190:9090"]
     volumes:
       - ./config.yaml:/app/config.yaml:ro
@@ -98,6 +99,7 @@ services:
   celery-worker:
     build: {context: ., dockerfile: Dockerfile}
     container_name: celery-worker
+    dns: ["8.8.8.8", "8.8.4.4"]
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - knowledge_data:/data/knowledge
