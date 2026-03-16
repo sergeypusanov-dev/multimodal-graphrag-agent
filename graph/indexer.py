@@ -1,9 +1,18 @@
 import json, logging, uuid
 import yaml
+from psycopg2.extensions import adapt, register_adapter, AsIs
 
 from llm.adapter import batch_llm
 from vector_store.adapter import store_chunk
 from security.middleware import batch_circuit
+
+
+def _uuid_array(uuids):
+    """Cast list of UUID strings to PostgreSQL uuid[] literal."""
+    if not uuids:
+        return AsIs("'{}'::uuid[]")
+    inner = ",".join(str(u) for u in uuids)
+    return AsIs(f"ARRAY[{','.join(repr(str(u)) for u in uuids)}]::uuid[]")
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +69,7 @@ def run_indexing_pipeline(file_path: str, processed: dict, config: dict, db) -> 
                                    source_file, chunk_index, timestamp_ms, frame_number, metadata)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, [chunk_id, chunk_text, media_type,
-              list(entity_ids.values()) if entity_ids else [],
+              _uuid_array(list(entity_ids.values())) if entity_ids else AsIs("'{}'::uuid[]"),
               doc_id, file_path, i,
               metadata.get("timestamp_ms"), metadata.get("frame_number"),
               json.dumps(metadata)])
@@ -166,6 +175,21 @@ def _upsert_relationships(db, relationships: list, name_to_id: dict,
               rel.get("weight", 1.0), doc_date, [doc_id]])
 
 
+def _normalize_date(raw: str) -> str:
+    """Normalize partial dates to valid ISO timestamps."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    import re
+    if re.match(r'^\d{4}$', raw):
+        return f"{raw}-01-01"
+    if re.match(r'^\d{4}-\d{1,2}$', raw):
+        return f"{raw}-01"
+    if re.match(r'^\d{4}-\d{1,2}-\d{1,2}$', raw):
+        return raw
+    return raw
+
+
 def _upsert_events(db, events: list, name_to_id: dict,
                    doc_id: str, media_type: str):
     for evt in events:
@@ -173,13 +197,13 @@ def _upsert_events(db, events: list, name_to_id: dict,
         entity_ids = [name_to_id[n] for n in entity_names if n in name_to_id]
         if not entity_ids:
             continue
-        event_date = evt.get("date")
+        event_date = _normalize_date(evt.get("date"))
         if not event_date:
             continue
         db.execute("""
             INSERT INTO kg_events (entity_ids, event_type, event_date,
               date_precision, description, doc_ids, media_refs)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, [entity_ids, evt.get("event_type", "unknown"), event_date,
+        """, [_uuid_array(entity_ids), evt.get("event_type", "unknown"), event_date,
               evt.get("date_precision", "day"), evt.get("description", ""),
               [doc_id], json.dumps([{"type": media_type}])])

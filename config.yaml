@@ -4,9 +4,8 @@
 # KNOWLEDGE BASE
 # ═══════════════════════════════════════════════════════
 knowledge_base:
-  # WSL2: НЕ используй /mnt/c/... — медленно!
-  # Правильно: ~/data/knowledge
-  watch_folder: "~/data/knowledge"
+  # Docker: /data/knowledge (volume), Host: ~/data/knowledge
+  watch_folder: "/data/knowledge"
   sync_schedule: "0 */2 * * *"       # каждые 2 часа
   supported_formats:
     text:  [".txt",".md",".rst",".html",".pdf",".docx",".csv",".json"]

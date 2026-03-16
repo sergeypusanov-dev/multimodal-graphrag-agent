@@ -27,9 +27,13 @@ class DBWrapper:
             return dict(r) if r else None
 
     def execute(self, sql: str, params=None):
-        with self.conn.cursor() as cur:
-            cur.execute(sql, params or [])
-        self.conn.commit()
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(sql, params or [])
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
 
     def execute_script(self, sql: str):
         with self.conn.cursor() as cur:
