@@ -1,18 +1,19 @@
-.PHONY: up up-cpu down restart logs shell validate sync ps wsl-check pull-models ollama-logs
+.PHONY: up up-cpu down restart logs shell validate sync ps wsl-check pull-models ollama-logs web
 
 up: wsl-check
 	@mkdir -p ~/data/knowledge
 	docker compose up -d
-	@echo "  Agent API:  http://localhost:8000"
-	@echo "  Metrics:    http://localhost:9090/metrics"
-	@echo "  Agent Card: http://localhost:8000/.well-known/agent.json"
-	@echo "  KB Stats:   http://localhost:8000/kb/stats"
+	@echo "  Web UI:     http://localhost:3000"
+	@echo "  Admin:      http://localhost:3000/admin.html"
+	@echo "  Agent API:  http://localhost:8100"
 	@echo "  Ollama:     http://localhost:11434"
 
 up-cpu: wsl-check
 	@mkdir -p ~/data/knowledge
 	docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
 	@echo "  Started in CPU-only mode (no GPU)"
+	@echo "  Web UI:  http://localhost:3000"
+	@echo "  Admin:   http://localhost:3000/admin.html"
 
 down:
 	docker compose down

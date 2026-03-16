@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphRAG Agent</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body { display: flex; height: 100vh; overflow: hidden; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--bg-sidebar);
+            color: var(--text-sidebar);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-header h2 { font-size: 16px; color: #fff; }
+        .sidebar-header small { color: var(--text-muted); font-size: 12px; }
+        .new-chat-btn {
+            margin: 12px 16px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px dashed rgba(255,255,255,0.3);
+            border-radius: var(--radius);
+            color: #fff;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+        }
+        .new-chat-btn:hover { background: rgba(255,255,255,0.15); }
+        .sessions { flex: 1; overflow-y: auto; padding: 8px; }
+        .session-item {
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .session-item:hover { background: rgba(255,255,255,0.08); }
+        .session-item.active { background: rgba(59,130,246,0.3); }
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 12px;
+        }
+        .sidebar-footer a { color: var(--text-sidebar); }
+
+        /* Main */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-dot.ok { background: var(--success); }
+        .status-dot.err { background: var(--danger); }
+
+        /* Messages */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .msg {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .msg-user {
+            align-self: flex-end;
+            background: var(--primary);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg-agent {
+            align-self: flex-start;
+            background: var(--bg-card);
+            box-shadow: var(--shadow);
+            border-bottom-left-radius: 4px;
+        }
+        .msg-agent .source { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+        .msg-agent .latency { font-size: 11px; color: var(--text-muted); }
+        .msg-system {
+            align-self: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .msg-files {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;
+        }
+        .msg-file-chip {
+            font-size: 11px;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .welcome {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: var(--text-muted);
+        }
+        .welcome h1 { font-size: 24px; color: var(--text); margin-bottom: 8px; }
+
+        /* Input */
+        .input-area {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .input-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+        .input-row textarea {
+            flex: 1;
+            resize: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 14px;
+            font-size: 14px;
+            font-family: inherit;
+            max-height: 120px;
+            outline: none;
+        }
+        .input-row textarea:focus { border-color: var(--primary); }
+        .attach-btn {
+            width: 40px; height: 40px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-input);
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .attach-btn:hover { background: var(--border); }
+        .file-preview {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .file-chip {
+            display: flex; align-items: center; gap: 4px;
+            background: #dbeafe; color: #1e40af;
+            padding: 4px 10px; border-radius: 12px; font-size: 12px;
+        }
+        .file-chip button {
+            background: none; border: none; cursor: pointer;
+            color: #1e40af; font-size: 14px; padding: 0 2px;
+        }
+
+        /* Auth modal */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .modal {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal h3 { margin-bottom: 12px; }
+        .modal input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>GraphRAG Agent</h2>
+            <small>Temporal Knowledge Base</small>
+        </div>
+        <div class="new-chat-btn" id="newChat">+ New Chat</div>
+        <div class="sessions" id="sessions"></div>
+        <div class="sidebar-footer">
+            <a href="/admin.html">Admin Panel</a>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+        <div class="topbar">
+            <span><span class="status-dot" id="statusDot"></span><span id="statusText">Connecting...</span></span>
+            <span style="font-size:13px;color:var(--text-muted)" id="kbInfo"></span>
+        </div>
+        <div class="messages" id="messages">
+            <div class="welcome" id="welcome">
+                <h1>Multimodal GraphRAG Agent</h1>
+                <p>Ask questions about your knowledge base or upload files for analysis.</p>
+            </div>
+        </div>
+        <div class="input-area">
+            <div class="file-preview" id="filePreview"></div>
+            <div class="input-row">
+                <label class="attach-btn" title="Attach files">
+                    <input type="file" multiple hidden id="fileInput"
+                           accept=".txt,.md,.pdf,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp,.mp3,.wav,.m4a,.mp4,.avi,.mov">
+                    &#x1f4ce;
+                </label>
+                <textarea id="msgInput" rows="1" placeholder="Type your message..."></textarea>
+                <button class="btn btn-primary" id="sendBtn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth modal -->
+    <div class="modal-overlay" id="authModal" style="display:none">
+        <div class="modal">
+            <h3>API Key Required</h3>
+            <p style="font-size:14px;color:var(--text-muted);margin-bottom:12px">Enter the Bearer token to access the agent.</p>
+            <input type="password" id="tokenInput" placeholder="a2a-secret-key-change-me">
+            <button class="btn btn-primary" style="width:100%" id="tokenSave">Connect</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as api from '/js/api.js';
+
+        // State
+        let currentSession = null;
+        let sessions = JSON.parse(localStorage.getItem('chat_sessions') || '{}');
+        let attachedFiles = [];
+
+        // Auth
+        if (!api.getToken()) document.getElementById('authModal').style.display = 'flex';
+        document.getElementById('tokenSave').onclick = () => {
+            api.setToken(document.getElementById('tokenInput').value.trim());
+            document.getElementById('authModal').style.display = 'none';
+            checkHealth();
+        };
+
+        // Health polling
+        async function checkHealth() {
+            try {
+                const h = await api.getHealth();
+                document.getElementById('statusDot').className = 'status-dot ok';
+                document.getElementById('statusText').textContent = 'Connected';
+                const stats = await api.getKbStats();
+                document.getElementById('kbInfo').textContent =
+                    `KB: ${stats.entities} entities, ${stats.indexed_files} files`;
+            } catch(e) {
+                document.getElementById('statusDot').className = 'status-dot err';
+                document.getElementById('statusText').textContent = 'Disconnected';
+                if (e.message === 'AUTH_FAILED') {
+                    document.getElementById('authModal').style.display = 'flex';
+                }
+            }
+        }
+        checkHealth();
+        setInterval(checkHealth, 30000);
+
+        // Sessions
+        function genId() { return crypto.randomUUID(); }
+
+        function renderSessions() {
+            const el = document.getElementById('sessions');
+            el.innerHTML = '';
+            const ids = Object.keys(sessions).sort((a,b) => {
+                const la = sessions[a].messages?.length || 0;
+                const lb = sessions[b].messages?.length || 0;
+                return lb - la;
+            });
+            for (const id of ids) {
+                const s = sessions[id];
+                const div = document.createElement('div');
+                div.className = 'session-item' + (id === currentSession ? ' active' : '');
+                div.textContent = s.title || id.slice(0,8);
+                div.onclick = () => loadSession(id);
+                el.appendChild(div);
+            }
+        }
+
+        function loadSession(id) {
+            currentSession = id;
+            renderSessions();
+            renderMessages();
+        }
+
+        function newSession() {
+            const id = genId();
+            sessions[id] = { title: 'New Chat', messages: [] };
+            saveSessions();
+            loadSession(id);
+        }
+
+        function saveSessions() {
+            localStorage.setItem('chat_sessions', JSON.stringify(sessions));
+        }
+
+        document.getElementById('newChat').onclick = newSession;
+        renderSessions();
+
+        // Messages
+        function renderMessages() {
+            const el = document.getElementById('messages');
+            const welcome = document.getElementById('welcome');
+            const msgs = sessions[currentSession]?.messages || [];
+            if (msgs.length === 0) {
+                el.innerHTML = '';
+                el.appendChild(welcome);
+                welcome.style.display = 'flex';
+                return;
+            }
+            welcome.style.display = 'none';
+            el.innerHTML = '';
+            for (const m of msgs) {
+                const div = document.createElement('div');
+                div.className = `msg msg-${m.role}`;
+                if (m.role === 'user') {
+                    div.textContent = m.text;
+                    if (m.files?.length) {
+                        const fd = document.createElement('div');
+                        fd.className = 'msg-files';
+                        for (const f of m.files) {
+                            const chip = document.createElement('span');
+                            chip.className = 'msg-file-chip';
+                            chip.textContent = f;
+                            fd.appendChild(chip);
+                        }
+                        div.appendChild(fd);
+                    }
+                } else {
+                    div.innerHTML = formatMarkdown(m.text);
+                    if (m.latency) {
+                        const lat = document.createElement('div');
+                        lat.className = 'latency';
+                        lat.textContent = `${(m.latency/1000).toFixed(1)}s`;
+                        div.appendChild(lat);
+                    }
+                }
+                el.appendChild(div);
+            }
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function formatMarkdown(text) {
+            return text
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>')
+                .replace(/\[source:\s*(.+?)\]/g, '<span class="source">[source: $1]</span>');
+        }
+
+        // File attach
+        const fileInput = document.getElementById('fileInput');
+        fileInput.onchange = () => {
+            for (const f of fileInput.files) attachedFiles.push(f);
+            fileInput.value = '';
+            renderFilePreview();
+        };
+
+        function renderFilePreview() {
+            const el = document.getElementById('filePreview');
+            el.innerHTML = '';
+            attachedFiles.forEach((f, i) => {
+                const chip = document.createElement('span');
+                chip.className = 'file-chip';
+                chip.innerHTML = `${f.name} <button data-idx="${i}">&times;</button>`;
+                chip.querySelector('button').onclick = () => {
+                    attachedFiles.splice(i, 1);
+                    renderFilePreview();
+                };
+                el.appendChild(chip);
+            });
+        }
+
+        // Send
+        const msgInput = document.getElementById('msgInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        msgInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+        });
+        msgInput.addEventListener('input', () => {
+            msgInput.style.height = 'auto';
+            msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+        });
+        sendBtn.onclick = send;
+
+        async function send() {
+            const text = msgInput.value.trim();
+            if (!text && attachedFiles.length === 0) return;
+            if (!currentSession) newSession();
+
+            const userMsg = { role: 'user', text, files: attachedFiles.map(f => f.name) };
+            sessions[currentSession].messages.push(userMsg);
+            if (sessions[currentSession].messages.length === 1) {
+                sessions[currentSession].title = text.slice(0, 40);
+            }
+            saveSessions();
+            renderMessages();
+            renderSessions();
+
+            msgInput.value = '';
+            msgInput.style.height = 'auto';
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="spinner"></span>';
+
+            const filesToSend = [...attachedFiles];
+            attachedFiles = [];
+            renderFilePreview();
+
+            try {
+                let data;
+                if (filesToSend.length > 0) {
+                    data = await api.chatMultimodal(text, filesToSend, currentSession);
+                } else {
+                    data = await api.chat(text, currentSession);
+                }
+                sessions[currentSession].messages.push({
+                    role: 'agent',
+                    text: data.answer,
+                    latency: data.latency_ms
+                });
+            } catch(e) {
+                sessions[currentSession].messages.push({
+                    role: 'agent',
+                    text: `Error: ${e.message}`
+                });
+                if (e.message === 'AUTH_FAILED') {
+                    document.getElementById('authModal').style.display = 'flex';
+                }
+            }
+            saveSessions();
+            renderMessages();
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Send';
+        }
+    </script>
+</body>
+</html>

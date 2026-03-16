@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — GraphRAG Agent</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body { min-height: 100vh; }
+        .topnav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            height: 56px;
+        }
+        .topnav h1 { font-size: 16px; margin-right: auto; }
+        .topnav a {
+            font-size: 14px; color: var(--text-muted);
+            padding: 16px 0; border-bottom: 2px solid transparent;
+        }
+        .topnav a.active { color: var(--primary); border-color: var(--primary); font-weight: 600; }
+        .topnav a:hover { color: var(--text); text-decoration: none; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        .tab { display: none; }
+        .tab.active { display: block; }
+
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+        .stat-card { text-align: center; padding: 24px; }
+        .circuit-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+        .circuit-name { font-weight: 500; min-width: 80px; }
+
+        .section-title {
+            font-size: 18px; font-weight: 600;
+            margin-bottom: 16px; padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Upload zone */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            margin-bottom: 16px;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+        .upload-zone p { color: var(--text-muted); margin-top: 8px; font-size: 14px; }
+
+        /* Entity search */
+        .search-row {
+            display: flex; gap: 8px; margin-bottom: 16px;
+        }
+        .search-row input {
+            flex: 1; padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+        }
+
+        .refresh-info {
+            font-size: 12px; color: var(--text-muted);
+            text-align: right; margin-bottom: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-4 { grid-template-columns: 1fr 1fr; }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <h1>GraphRAG Admin</h1>
+        <a href="#overview" class="tab-link active" data-tab="overview">Overview</a>
+        <a href="#kb" class="tab-link" data-tab="kb">Knowledge Base</a>
+        <a href="#system" class="tab-link" data-tab="system">System</a>
+        <a href="/" style="margin-left:auto;font-size:13px">Chat UI</a>
+    </nav>
+
+    <div class="container">
+        <!-- Overview Tab -->
+        <div class="tab active" id="tab-overview">
+            <div class="grid-4">
+                <div class="card stat-card">
+                    <div class="stat-number" id="statEntities">-</div>
+                    <div class="stat-label">Entities</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-number" id="statRels">-</div>
+                    <div class="stat-label">Relationships</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-number" id="statChunks">-</div>
+                    <div class="stat-label">Chunks</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-number" id="statFiles">-</div>
+                    <div class="stat-label">Indexed Files</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="section-title">System Health</div>
+                    <div id="healthStatus">Loading...</div>
+                </div>
+                <div class="card">
+                    <div class="section-title">Agent Info</div>
+                    <div id="agentInfo">Loading...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">Metrics</div>
+                <div class="refresh-info">Auto-refresh every 15s</div>
+                <table id="metricsTable">
+                    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Knowledge Base Tab -->
+        <div class="tab" id="tab-kb">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="section-title">Upload Documents</div>
+                    <div class="upload-zone" id="uploadZone">
+                        <div style="font-size:36px">&#128193;</div>
+                        <p>Drag & drop files here or click to select</p>
+                        <p style="font-size:12px">PDF, DOCX, TXT, MD, images, audio, video</p>
+                        <input type="file" multiple hidden id="uploadInput"
+                               accept=".txt,.md,.pdf,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp,.mp3,.wav,.m4a,.mp4,.avi,.mov">
+                    </div>
+                    <div id="uploadStatus"></div>
+                </div>
+                <div class="card">
+                    <div class="section-title">Actions</div>
+                    <p style="margin-bottom:16px;color:var(--text-muted);font-size:14px">
+                        Trigger manual sync to index new/changed files in the knowledge folder.
+                    </p>
+                    <button class="btn btn-primary" id="syncBtn" style="width:100%;margin-bottom:12px">
+                        Sync Knowledge Base
+                    </button>
+                    <div id="syncStatus" style="font-size:13px;color:var(--text-muted)"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">Indexed Files</div>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <button class="btn btn-sm btn-secondary file-filter active" data-status="">All</button>
+                    <button class="btn btn-sm btn-secondary file-filter" data-status="indexed">Indexed</button>
+                    <button class="btn btn-sm btn-secondary file-filter" data-status="processing">Processing</button>
+                    <button class="btn btn-sm btn-secondary file-filter" data-status="failed">Failed</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>File</th><th>Status</th><th>Entities</th><th>Chunks</th><th>Indexed At</th><th>Error</th></tr>
+                    </thead>
+                    <tbody id="filesTable"></tbody>
+                </table>
+                <div id="filesEmpty" style="padding:20px;text-align:center;color:var(--text-muted);display:none">
+                    No files indexed yet. Upload documents above.
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:16px">
+                <div class="section-title">Entity Browser</div>
+                <div class="search-row">
+                    <input type="text" id="entitySearch" placeholder="Search entities...">
+                    <button class="btn btn-primary" id="entitySearchBtn">Search</button>
+                </div>
+                <table>
+                    <thead><tr><th>Name</th><th>Type</th><th>Description</th><th>Media</th></tr></thead>
+                    <tbody id="entitiesTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- System Tab -->
+        <div class="tab" id="tab-system">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="section-title">API Key</div>
+                    <p style="font-size:14px;color:var(--text-muted);margin-bottom:12px">
+                        Bearer token for API authorization. Stored locally in browser.
+                    </p>
+                    <div style="display:flex;gap:8px">
+                        <input type="password" id="sysToken" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px">
+                        <button class="btn btn-primary" id="sysTokenSave">Save</button>
+                        <button class="btn btn-secondary" id="sysTokenTest">Test</button>
+                    </div>
+                    <div id="sysTokenStatus" style="margin-top:8px;font-size:13px"></div>
+                </div>
+                <div class="card">
+                    <div class="section-title">Configuration</div>
+                    <div id="configInfo" style="font-size:13px;line-height:1.8">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as api from '/js/api.js';
+
+        // Auth
+        if (!api.getToken()) {
+            const t = prompt('Enter API key (Bearer token):');
+            if (t) api.setToken(t);
+        }
+        document.getElementById('sysToken').value = api.getToken();
+        document.getElementById('sysTokenSave').onclick = () => {
+            api.setToken(document.getElementById('sysToken').value.trim());
+            showToast('Token saved', 'success');
+        };
+        document.getElementById('sysTokenTest').onclick = async () => {
+            try {
+                await api.getHealth();
+                document.getElementById('sysTokenStatus').innerHTML = '<span style="color:var(--success)">Connected</span>';
+            } catch(e) {
+                document.getElementById('sysTokenStatus').innerHTML = '<span style="color:var(--danger)">Failed</span>';
+            }
+        };
+
+        // Tabs
+        document.querySelectorAll('.tab-link').forEach(link => {
+            link.onclick = e => {
+                e.preventDefault();
+                document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                link.classList.add('active');
+                document.getElementById(`tab-${link.dataset.tab}`).classList.add('active');
+            };
+        });
+
+        // Overview: Stats
+        async function loadStats() {
+            try {
+                const s = await api.getKbStats();
+                document.getElementById('statEntities').textContent = s.entities;
+                document.getElementById('statRels').textContent = s.relationships;
+                document.getElementById('statChunks').textContent = s.chunks;
+                document.getElementById('statFiles').textContent = s.indexed_files;
+            } catch(e) {}
+        }
+
+        // Overview: Health
+        async function loadHealth() {
+            try {
+                const h = await api.getHealth();
+                const el = document.getElementById('healthStatus');
+                el.innerHTML = `
+                    <div class="circuit-row">
+                        <span class="circuit-name">Status</span>
+                        <span class="badge badge-success">${h.status}</span>
+                    </div>
+                    ${Object.entries(h.circuits).map(([k,v]) => `
+                        <div class="circuit-row">
+                            <span class="circuit-name">${k}</span>
+                            <span class="badge badge-${v === 'closed' ? 'success' : v === 'open' ? 'danger' : 'warning'}">${v}</span>
+                        </div>
+                    `).join('')}
+                `;
+            } catch(e) {
+                document.getElementById('healthStatus').innerHTML = '<span class="badge badge-danger">Disconnected</span>';
+            }
+        }
+
+        // Overview: Agent info
+        async function loadAgentInfo() {
+            try {
+                const card = await api.getAgentCard();
+                document.getElementById('agentInfo').innerHTML = `
+                    <div style="margin-bottom:8px"><strong>${card.name}</strong> v${card.version}</div>
+                    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">${card.description}</div>
+                    <div style="font-size:13px"><strong>Skills:</strong></div>
+                    ${card.skills.map(s => `<div style="font-size:12px;padding:2px 0">- ${s.name}: ${s.description}</div>`).join('')}
+                `;
+            } catch(e) {}
+        }
+
+        // Overview: Metrics
+        async function loadMetrics() {
+            try {
+                const raw = await api.getMetrics();
+                const lines = raw.split('\n').filter(l => l && !l.startsWith('#'));
+                const interesting = ['kg_entities_total', 'kg_relationships_total', 'agent_tasks_total', 'llm_tokens_total'];
+                const tbody = document.querySelector('#metricsTable tbody');
+                tbody.innerHTML = '';
+                for (const line of lines) {
+                    const match = line.match(/^(\w+)(\{[^}]*\})?\s+(.+)$/);
+                    if (!match) continue;
+                    const [, name, labels, value] = match;
+                    if (interesting.some(m => name.startsWith(m)) || name.includes('total')) {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td style="font-family:monospace;font-size:12px">${name}${labels || ''}</td><td>${parseFloat(value).toLocaleString()}</td>`;
+                        tbody.appendChild(tr);
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // KB: Files
+        let currentFileFilter = '';
+        async function loadFiles() {
+            try {
+                const data = await api.getKbFiles(currentFileFilter || undefined);
+                const tbody = document.getElementById('filesTable');
+                const empty = document.getElementById('filesEmpty');
+                tbody.innerHTML = '';
+                if (data.files.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+                empty.style.display = 'none';
+                for (const f of data.files) {
+                    const name = f.file_path?.split('/').pop() || f.file_path;
+                    const statusCls = f.status === 'indexed' ? 'success' : f.status === 'failed' ? 'danger' : 'warning';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td title="${f.file_path}">${name}</td>
+                        <td><span class="badge badge-${statusCls}">${f.status}</span></td>
+                        <td>${f.entity_count || 0}</td>
+                        <td>${f.chunk_count || 0}</td>
+                        <td style="font-size:12px">${f.indexed_at || '-'}</td>
+                        <td style="font-size:12px;color:var(--danger)">${f.error_msg || ''}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            } catch(e) {}
+        }
+
+        document.querySelectorAll('.file-filter').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.file-filter').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFileFilter = btn.dataset.status;
+                loadFiles();
+            };
+        });
+
+        // KB: Upload
+        const uploadZone = document.getElementById('uploadZone');
+        const uploadInput = document.getElementById('uploadInput');
+
+        uploadZone.onclick = () => uploadInput.click();
+        uploadZone.ondragover = e => { e.preventDefault(); uploadZone.classList.add('dragover'); };
+        uploadZone.ondragleave = () => uploadZone.classList.remove('dragover');
+        uploadZone.ondrop = async e => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            await doUpload(e.dataTransfer.files);
+        };
+        uploadInput.onchange = async () => { await doUpload(uploadInput.files); uploadInput.value = ''; };
+
+        async function doUpload(files) {
+            if (!files.length) return;
+            const status = document.getElementById('uploadStatus');
+            status.innerHTML = `<span class="spinner"></span> Uploading ${files.length} file(s)...`;
+            try {
+                const res = await api.uploadFiles(files);
+                status.innerHTML = `<span style="color:var(--success)">Uploaded ${res.uploaded} file(s)</span>`;
+                showToast(`${res.uploaded} file(s) uploaded`, 'success');
+                setTimeout(loadFiles, 2000);
+            } catch(e) {
+                status.innerHTML = `<span style="color:var(--danger)">Upload failed: ${e.message}</span>`;
+            }
+        }
+
+        // KB: Sync
+        document.getElementById('syncBtn').onclick = async () => {
+            const btn = document.getElementById('syncBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Syncing...';
+            try {
+                const res = await api.triggerSync();
+                document.getElementById('syncStatus').textContent = `Sync queued (task: ${res.task_id?.slice(0,8)}...)`;
+                showToast('Sync triggered', 'success');
+                setTimeout(loadFiles, 5000);
+                setTimeout(loadStats, 5000);
+            } catch(e) {
+                document.getElementById('syncStatus').textContent = `Sync failed: ${e.message}`;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Sync Knowledge Base';
+        };
+
+        // KB: Entities
+        async function loadEntities(search) {
+            try {
+                const data = await api.getEntities(search);
+                const tbody = document.getElementById('entitiesTable');
+                tbody.innerHTML = '';
+                for (const e of data.entities) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${e.name}</strong></td>
+                        <td><span class="badge badge-info">${e.type}</span></td>
+                        <td style="font-size:13px;max-width:400px;overflow:hidden;text-overflow:ellipsis">${e.description || '-'}</td>
+                        <td style="font-size:12px">${e.media_type || 'text'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            } catch(e) {}
+        }
+
+        document.getElementById('entitySearchBtn').onclick = () => {
+            loadEntities(document.getElementById('entitySearch').value.trim());
+        };
+        document.getElementById('entitySearch').onkeydown = e => {
+            if (e.key === 'Enter') loadEntities(e.target.value.trim());
+        };
+
+        // System: Config
+        async function loadConfig() {
+            try {
+                const card = await api.getAgentCard();
+                const stats = await api.getKbStats();
+                document.getElementById('configInfo').innerHTML = `
+                    <div><strong>Agent:</strong> ${card.name} v${card.version}</div>
+                    <div><strong>Capabilities:</strong> streaming=${card.capabilities?.streaming}, push=${card.capabilities?.pushNotifications}</div>
+                    <div><strong>Skills:</strong> ${card.skills?.length || 0}</div>
+                    <div><strong>KB Size:</strong> ${stats.entities} entities, ${stats.relationships} rels, ${stats.chunks} chunks</div>
+                    <div><strong>Input Modes:</strong> ${card.defaultInputModes?.join(', ')}</div>
+                    <div><strong>Output Modes:</strong> ${card.defaultOutputModes?.join(', ')}</div>
+                `;
+            } catch(e) {}
+        }
+
+        // Toast
+        function showToast(msg, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Init
+        loadStats(); loadHealth(); loadAgentInfo(); loadMetrics(); loadFiles(); loadEntities(); loadConfig();
+        setInterval(() => { loadStats(); loadHealth(); loadMetrics(); }, 15000);
+    </script>
+</body>
+</html>

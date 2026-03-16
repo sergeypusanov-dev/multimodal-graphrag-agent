@@ -127,6 +127,14 @@ services:
     restart: unless-stopped
     command: celery -A tasks.watcher beat --loglevel=info
 
+  web:
+    build: {context: ./web, dockerfile: Dockerfile}
+    container_name: agent-web
+    ports: ["3100:80"]
+    depends_on:
+      agent: {condition: service_started}
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
   redis_data:

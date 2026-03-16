@@ -109,3 +109,60 @@ async def kb_stats():
     files    = db.fetchone("SELECT COUNT(*) as n FROM kg_file_index WHERE status='indexed'")["n"]
     GRAPH_NODES.set(entities); GRAPH_EDGES.set(rels)
     return {"entities":entities,"relationships":rels,"chunks":chunks,"indexed_files":files}
+
+@app.get("/kb/files")
+async def kb_files(status: Optional[str] = None, limit: int = 100, offset: int = 0):
+    from database import get_db
+    db = get_db()
+    where = "WHERE status=%s" if status else ""
+    params = [status, limit, offset] if status else [limit, offset]
+    sql = f"""SELECT id, file_path, file_hash, status, entity_count, chunk_count,
+                     indexed_at, last_modified, error_msg
+              FROM kg_file_index {where}
+              ORDER BY indexed_at DESC NULLS LAST LIMIT %s OFFSET %s"""
+    rows = db.fetch(sql, params)
+    for r in rows:
+        for k in ("indexed_at", "last_modified"):
+            if r.get(k): r[k] = str(r[k])
+        if r.get("id"): r["id"] = str(r["id"])
+    total = db.fetchone(f"SELECT COUNT(*) as n FROM kg_file_index {where}",
+                        [status] if status else [])["n"]
+    return {"files": rows, "total": total}
+
+@app.post("/kb/upload")
+async def kb_upload(
+    files: List[UploadFile] = File(...),
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    import os
+    saved = []
+    for f in files:
+        dest = f"/data/knowledge/{f.filename}"
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "wb") as out:
+            out.write(await f.read())
+        saved.append({"filename": f.filename, "path": dest, "size": os.path.getsize(dest)})
+    return {"uploaded": len(saved), "files": saved}
+
+@app.post("/kb/sync")
+async def kb_sync(
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from tasks.watcher import sync_knowledge_folder
+    task = sync_knowledge_folder.apply_async(queue="default")
+    return {"task_id": task.id, "status": "queued"}
+
+@app.get("/kb/entities")
+async def kb_entities(limit: int = 50, offset: int = 0, search: Optional[str] = None):
+    from database import get_db
+    db = get_db()
+    where = "WHERE name ILIKE %s OR type ILIKE %s" if search else ""
+    params = ([f"%{search}%", f"%{search}%", limit, offset] if search
+              else [limit, offset])
+    rows = db.fetch(f"""SELECT id, name, type, description, media_type, created_at
+                        FROM kg_entities {where}
+                        ORDER BY created_at DESC LIMIT %s OFFSET %s""", params)
+    for r in rows:
+        if r.get("id"): r["id"] = str(r["id"])
+        if r.get("created_at"): r["created_at"] = str(r["created_at"])
+    return {"entities": rows}
