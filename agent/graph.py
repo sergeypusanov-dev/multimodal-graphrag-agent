@@ -58,7 +58,7 @@ def retrieval_node(state: AgentState) -> dict:
     cached = cache_mgr.get_semantic(query)
     if cached:
         return {"graph_context":cached,"retrieved_chunks":[]}
-    chunks = search_chunks(query, top_k=10)
+    chunks = search_chunks(query, top_k=20)
     from graph.query import build_graph_context
     ctx = build_graph_context(chunks, state.get("query_mode","local"), state.get("date_a"), state)
     return {"retrieved_chunks":chunks,"graph_context":ctx}

@@ -68,8 +68,8 @@ async def chat(req: ChatRequest,
 
 @app.post("/chat/multimodal")
 async def chat_multimodal(
-    message: str = Form(...),
-    session_id: Optional[str] = Form(None),
+    message: str = Form(default="Describe the attached file(s)."),
+    session_id: Optional[str] = Form(default=None),
     files: List[UploadFile] = File(default=[]),
     auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
 ):
@@ -138,10 +138,14 @@ async def kb_upload(
     saved = []
     for f in files:
         dest = f"/data/knowledge/{f.filename}"
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        with open(dest, "wb") as out:
-            out.write(await f.read())
-        saved.append({"filename": f.filename, "path": dest, "size": os.path.getsize(dest)})
+        try:
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with open(dest, "wb") as out:
+                out.write(await f.read())
+            saved.append({"filename": f.filename, "path": dest, "size": os.path.getsize(dest)})
+        except PermissionError:
+            from fastapi import HTTPException
+            raise HTTPException(500, f"Permission denied writing to {dest}. Fix: docker exec -u root agent-api chown -R agent:agent /data/knowledge")
     return {"uploaded": len(saved), "files": saved}
 
 @app.post("/kb/sync")

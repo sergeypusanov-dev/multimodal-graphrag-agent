@@ -88,9 +88,9 @@ embeddings:
     batch_size: 32
     normalize: true
   ollama:
-    model: "nomic-embed-text"
+    model: "snowflake-arctic-embed2"
     base_url: "http://ollama:11434"
-    dimensions: 768
+    dimensions: 1024
     batch_size: 64
 
 # ═══════════════════════════════════════════════════════

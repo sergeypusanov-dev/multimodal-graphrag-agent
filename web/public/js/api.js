@@ -16,10 +16,12 @@ function headers(extra = {}) {
 }
 
 async function request(path, opts = {}) {
-    const res = await fetch(`${API}${path}`, {
-        ...opts,
-        headers: { ...headers(), ...(opts.headers || {}) }
-    });
+    const mergedHeaders = {
+        ...headers(),
+        ...(opts.headers || {})
+    };
+    const fetchOpts = { ...opts, headers: mergedHeaders };
+    const res = await fetch(`${API}${path}`, fetchOpts);
     if (res.status === 401 || res.status === 403) {
         throw new Error('AUTH_FAILED');
     }
@@ -32,6 +34,7 @@ export async function chat(message, sessionId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, session_id: sessionId })
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }
 

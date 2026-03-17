@@ -11,7 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN useradd -m -u 1000 agent && chown -R agent:agent /app
+RUN useradd -m -u 1000 agent && chown -R agent:agent /app && \
+    mkdir -p /data/knowledge && chown -R agent:agent /data
 USER agent
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app WATCHDOG_POLLING=false
