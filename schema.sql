@@ -102,6 +102,52 @@ CREATE INDEX ON kg_relationships (source_id);
 CREATE INDEX ON kg_relationships (target_id);
 CREATE INDEX ON kg_relationships (valid_from, valid_to);
 CREATE INDEX ON kg_chunks (doc_id);
+
+-- ═══════════════════════════════════════════════════════
+-- AGENT SETTINGS & RULES
+-- ═══════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS agent_settings (
+    id              INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    system_prompt   TEXT DEFAULT '',
+    personality     TEXT DEFAULT '',
+    language        TEXT DEFAULT '',
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+INSERT INTO agent_settings (system_prompt) VALUES ('') ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS agent_rules (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    rule_text   TEXT NOT NULL,
+    category    TEXT DEFAULT 'general',
+    enabled     BOOLEAN DEFAULT TRUE,
+    priority    INT DEFAULT 0,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ═══════════════════════════════════════════════════════
+-- MCP TOOLS
+-- ═══════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name        TEXT NOT NULL UNIQUE,
+    url         TEXT NOT NULL,
+    api_key     TEXT,
+    enabled     BOOLEAN DEFAULT TRUE,
+    status      TEXT DEFAULT 'disconnected',
+    last_check  TIMESTAMPTZ,
+    error_msg   TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS mcp_tools (
+    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    server_id    UUID NOT NULL REFERENCES mcp_servers(id) ON DELETE CASCADE,
+    tool_name    TEXT NOT NULL,
+    description  TEXT,
+    input_schema JSONB DEFAULT '{}',
+    enabled      BOOLEAN DEFAULT TRUE,
+    UNIQUE (server_id, tool_name)
+);
 CREATE INDEX ON kg_chunks (media_type);
 CREATE INDEX ON kg_events (event_date);
 CREATE INDEX ON kg_events USING GIN (entity_ids);

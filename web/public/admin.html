@@ -7,157 +7,85 @@
     <link rel="stylesheet" href="/css/style.css">
     <style>
         body { min-height: 100vh; }
-        .topnav {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            padding: 0 24px;
-            display: flex;
-            align-items: center;
-            gap: 32px;
-            height: 56px;
-        }
+        .topnav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 24px; height: 56px; flex-wrap: wrap; }
         .topnav h1 { font-size: 16px; margin-right: auto; }
-        .topnav a {
-            font-size: 14px; color: var(--text-muted);
-            padding: 16px 0; border-bottom: 2px solid transparent;
-        }
+        .topnav a { font-size: 14px; color: var(--text-muted); padding: 16px 0; border-bottom: 2px solid transparent; }
         .topnav a.active { color: var(--primary); border-color: var(--primary); font-weight: 600; }
         .topnav a:hover { color: var(--text); text-decoration: none; }
-
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-
-        .tab { display: none; }
-        .tab.active { display: block; }
-
+        .tab { display: none; } .tab.active { display: block; }
         .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-
         .stat-card { text-align: center; padding: 24px; }
         .circuit-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
         .circuit-name { font-weight: 500; min-width: 80px; }
-
-        .section-title {
-            font-size: 18px; font-weight: 600;
-            margin-bottom: 16px; padding-bottom: 8px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        /* Upload zone */
-        .upload-zone {
-            border: 2px dashed var(--border);
-            border-radius: var(--radius);
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-            margin-bottom: 16px;
-        }
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: var(--primary);
-            background: #eff6ff;
-        }
+        .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; margin-bottom: 16px; }
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary); background: #eff6ff; }
         .upload-zone p { color: var(--text-muted); margin-top: 8px; font-size: 14px; }
-
-        /* Entity search */
-        .search-row {
-            display: flex; gap: 8px; margin-bottom: 16px;
-        }
-        .search-row input {
-            flex: 1; padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 14px;
-        }
-
-        .refresh-info {
-            font-size: 12px; color: var(--text-muted);
-            text-align: right; margin-bottom: 8px;
-        }
-
-        @media (max-width: 768px) {
-            .grid-4 { grid-template-columns: 1fr 1fr; }
-            .grid-2 { grid-template-columns: 1fr; }
-        }
+        .search-row { display: flex; gap: 8px; margin-bottom: 16px; }
+        .search-row input, .form-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; }
+        .form-textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-family: inherit; resize: vertical; }
+        .form-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: flex-end; }
+        .form-label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+        .refresh-info { font-size: 12px; color: var(--text-muted); text-align: right; margin-bottom: 8px; }
+        .toggle { position: relative; width: 40px; height: 22px; display: inline-block; }
+        .toggle input { display: none; }
+        .toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 11px; cursor: pointer; transition: 0.2s; }
+        .toggle-slider:before { content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: 0.2s; }
+        .toggle input:checked + .toggle-slider { background: var(--primary); }
+        .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+        .mcp-server-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+        .mcp-server-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .mcp-tool-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        @media (max-width: 768px) { .grid-4 { grid-template-columns: 1fr 1fr; } .grid-2 { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <nav class="topnav">
         <h1>GraphRAG Admin</h1>
-        <a href="#overview" class="tab-link active" data-tab="overview">Overview</a>
-        <a href="#kb" class="tab-link" data-tab="kb">Knowledge Base</a>
-        <a href="#system" class="tab-link" data-tab="system">System</a>
+        <a href="#" class="tab-link active" data-tab="overview">Overview</a>
+        <a href="#" class="tab-link" data-tab="kb">Knowledge Base</a>
+        <a href="#" class="tab-link" data-tab="agent">Agent</a>
+        <a href="#" class="tab-link" data-tab="mcp">MCP Tools</a>
+        <a href="#" class="tab-link" data-tab="system">System</a>
         <a href="/" style="margin-left:auto;font-size:13px">Chat UI</a>
     </nav>
 
     <div class="container">
-        <!-- Overview Tab -->
+        <!-- ═══ Overview ═══ -->
         <div class="tab active" id="tab-overview">
             <div class="grid-4">
-                <div class="card stat-card">
-                    <div class="stat-number" id="statEntities">-</div>
-                    <div class="stat-label">Entities</div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-number" id="statRels">-</div>
-                    <div class="stat-label">Relationships</div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-number" id="statChunks">-</div>
-                    <div class="stat-label">Chunks</div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-number" id="statFiles">-</div>
-                    <div class="stat-label">Indexed Files</div>
-                </div>
+                <div class="card stat-card"><div class="stat-number" id="statEntities">-</div><div class="stat-label">Entities</div></div>
+                <div class="card stat-card"><div class="stat-number" id="statRels">-</div><div class="stat-label">Relationships</div></div>
+                <div class="card stat-card"><div class="stat-number" id="statChunks">-</div><div class="stat-label">Chunks</div></div>
+                <div class="card stat-card"><div class="stat-number" id="statFiles">-</div><div class="stat-label">Indexed Files</div></div>
             </div>
-
             <div class="grid-2">
-                <div class="card">
-                    <div class="section-title">System Health</div>
-                    <div id="healthStatus">Loading...</div>
-                </div>
-                <div class="card">
-                    <div class="section-title">Agent Info</div>
-                    <div id="agentInfo">Loading...</div>
-                </div>
+                <div class="card"><div class="section-title">System Health</div><div id="healthStatus">Loading...</div></div>
+                <div class="card"><div class="section-title">Agent Info</div><div id="agentInfo">Loading...</div></div>
             </div>
-
-            <div class="card">
-                <div class="section-title">Metrics</div>
-                <div class="refresh-info">Auto-refresh every 15s</div>
-                <table id="metricsTable">
-                    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="card"><div class="section-title">Metrics</div><div class="refresh-info">Auto-refresh every 15s</div>
+                <table id="metricsTable"><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody></tbody></table>
             </div>
         </div>
 
-        <!-- Knowledge Base Tab -->
+        <!-- ═══ Knowledge Base ═══ -->
         <div class="tab" id="tab-kb">
             <div class="grid-2">
                 <div class="card">
                     <div class="section-title">Upload Documents</div>
-                    <div class="upload-zone" id="uploadZone">
-                        <div style="font-size:36px">&#128193;</div>
-                        <p>Drag & drop files here or click to select</p>
-                        <p style="font-size:12px">PDF, DOCX, TXT, MD, images, audio, video</p>
-                        <input type="file" multiple hidden id="uploadInput"
-                               accept=".txt,.md,.pdf,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp,.mp3,.wav,.m4a,.mp4,.avi,.mov">
-                    </div>
-                    <div id="uploadStatus"></div>
+                    <div class="upload-zone" id="uploadZone"><div style="font-size:36px">&#128193;</div><p>Drag & drop files or click to select</p>
+                        <input type="file" multiple hidden id="uploadInput" accept=".txt,.md,.pdf,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp,.mp3,.wav,.m4a,.mp4,.avi,.mov">
+                    </div><div id="uploadStatus"></div>
                 </div>
                 <div class="card">
                     <div class="section-title">Actions</div>
-                    <p style="margin-bottom:16px;color:var(--text-muted);font-size:14px">
-                        Trigger manual sync to index new/changed files in the knowledge folder.
-                    </p>
-                    <button class="btn btn-primary" id="syncBtn" style="width:100%;margin-bottom:12px">
-                        Sync Knowledge Base
-                    </button>
+                    <p style="margin-bottom:16px;color:var(--text-muted);font-size:14px">Trigger manual sync to index new/changed files.</p>
+                    <button class="btn btn-primary" id="syncBtn" style="width:100%;margin-bottom:12px">Sync Knowledge Base</button>
                     <div id="syncStatus" style="font-size:13px;color:var(--text-muted)"></div>
                 </div>
             </div>
-
             <div class="card">
                 <div class="section-title">Indexed Files</div>
                 <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -166,38 +94,76 @@
                     <button class="btn btn-sm btn-secondary file-filter" data-status="processing">Processing</button>
                     <button class="btn btn-sm btn-secondary file-filter" data-status="failed">Failed</button>
                 </div>
-                <table>
-                    <thead>
-                        <tr><th>File</th><th>Status</th><th>Entities</th><th>Chunks</th><th>Indexed At</th><th>Error</th></tr>
-                    </thead>
-                    <tbody id="filesTable"></tbody>
-                </table>
-                <div id="filesEmpty" style="padding:20px;text-align:center;color:var(--text-muted);display:none">
-                    No files indexed yet. Upload documents above.
-                </div>
+                <table><thead><tr><th>File</th><th>Status</th><th>Entities</th><th>Chunks</th><th>Indexed At</th><th>Error</th></tr></thead>
+                    <tbody id="filesTable"></tbody></table>
+                <div id="filesEmpty" style="padding:20px;text-align:center;color:var(--text-muted);display:none">No files indexed yet.</div>
             </div>
-
             <div class="card" style="margin-top:16px">
                 <div class="section-title">Entity Browser</div>
-                <div class="search-row">
-                    <input type="text" id="entitySearch" placeholder="Search entities...">
-                    <button class="btn btn-primary" id="entitySearchBtn">Search</button>
-                </div>
-                <table>
-                    <thead><tr><th>Name</th><th>Type</th><th>Description</th><th>Media</th></tr></thead>
-                    <tbody id="entitiesTable"></tbody>
-                </table>
+                <div class="search-row"><input type="text" id="entitySearch" placeholder="Search entities..."><button class="btn btn-primary" id="entitySearchBtn">Search</button></div>
+                <table><thead><tr><th>Name</th><th>Type</th><th>Description</th><th>Media</th></tr></thead><tbody id="entitiesTable"></tbody></table>
             </div>
         </div>
 
-        <!-- System Tab -->
+        <!-- ═══ Agent Settings & Rules ═══ -->
+        <div class="tab" id="tab-agent">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="section-title">Agent Settings</div>
+                    <div class="form-label">System Prompt</div>
+                    <textarea class="form-textarea" id="agentPrompt" rows="4" placeholder="You are a multimodal research assistant..."></textarea>
+                    <div style="margin-top:12px">
+                        <div class="form-label">Personality</div>
+                        <input class="form-input" id="agentPersonality" placeholder="e.g. professional, concise, friendly" style="width:100%;margin-bottom:8px">
+                    </div>
+                    <div>
+                        <div class="form-label">Language Preference</div>
+                        <input class="form-input" id="agentLanguage" placeholder="e.g. always respond in Russian" style="width:100%;margin-bottom:12px">
+                    </div>
+                    <button class="btn btn-primary" id="saveSettingsBtn" style="width:100%">Save Settings</button>
+                    <div id="settingsStatus" style="margin-top:8px;font-size:13px"></div>
+                </div>
+                <div class="card">
+                    <div class="section-title">Behavior Rules</div>
+                    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Rules the agent MUST follow. Higher priority = applied first.</p>
+                    <div class="form-row">
+                        <div style="flex:1"><input class="form-input" id="newRuleText" placeholder="Rule text..." style="width:100%"></div>
+                        <div><select id="newRuleCategory" style="padding:8px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px">
+                            <option value="general">General</option><option value="safety">Safety</option>
+                            <option value="formatting">Formatting</option><option value="domain">Domain</option>
+                        </select></div>
+                        <button class="btn btn-primary" id="addRuleBtn">Add</button>
+                    </div>
+                    <div id="rulesTable"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ MCP Tools ═══ -->
+        <div class="tab" id="tab-mcp">
+            <div class="card" style="margin-bottom:16px">
+                <div class="section-title">Add MCP Server</div>
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Connect an MCP-compatible tool server. Tools will be auto-discovered.</p>
+                <div class="form-row">
+                    <div style="flex:1"><input class="form-input" id="mcpName" placeholder="Server name" style="width:100%"></div>
+                    <div style="flex:2"><input class="form-input" id="mcpUrl" placeholder="http://localhost:3001" style="width:100%"></div>
+                    <div style="flex:1"><input class="form-input" id="mcpApiKey" placeholder="API key (optional)" style="width:100%"></div>
+                    <button class="btn btn-primary" id="addMcpBtn">Add & Discover</button>
+                </div>
+                <div id="mcpAddStatus" style="font-size:13px;margin-top:8px"></div>
+            </div>
+            <div id="mcpServersList"></div>
+            <div id="mcpEmpty" class="card" style="text-align:center;color:var(--text-muted);padding:40px">
+                No MCP servers configured. Add one above to extend the agent's capabilities.
+            </div>
+        </div>
+
+        <!-- ═══ System ═══ -->
         <div class="tab" id="tab-system">
             <div class="grid-2">
                 <div class="card">
                     <div class="section-title">API Key</div>
-                    <p style="font-size:14px;color:var(--text-muted);margin-bottom:12px">
-                        Bearer token for API authorization. Stored locally in browser.
-                    </p>
+                    <p style="font-size:14px;color:var(--text-muted);margin-bottom:12px">Bearer token stored in browser.</p>
                     <div style="display:flex;gap:8px">
                         <input type="password" id="sysToken" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px">
                         <button class="btn btn-primary" id="sysTokenSave">Save</button>
@@ -213,245 +179,191 @@
         </div>
     </div>
 
-    <script type="module">
-        import * as api from '/js/api.js';
+    <script>
+        // ─── API helpers ─────────────────────────
+        var API_TOKEN = localStorage.getItem('api_token') || '';
+        if (!API_TOKEN) { var t = prompt('Enter API key (Bearer token):'); if (t) { API_TOKEN = t; localStorage.setItem('api_token', t); } }
 
-        // Auth
-        if (!api.getToken()) {
-            const t = prompt('Enter API key (Bearer token):');
-            if (t) api.setToken(t);
+        function api(path, opts) {
+            opts = opts || {};
+            var h = Object.assign({}, opts.headers || {});
+            if (API_TOKEN) h['Authorization'] = 'Bearer ' + API_TOKEN;
+            opts.headers = h;
+            return fetch('/api' + path, opts).then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r;
+            });
         }
-        document.getElementById('sysToken').value = api.getToken();
-        document.getElementById('sysTokenSave').onclick = () => {
-            api.setToken(document.getElementById('sysToken').value.trim());
-            showToast('Token saved', 'success');
-        };
-        document.getElementById('sysTokenTest').onclick = async () => {
-            try {
-                await api.getHealth();
-                document.getElementById('sysTokenStatus').innerHTML = '<span style="color:var(--success)">Connected</span>';
-            } catch(e) {
-                document.getElementById('sysTokenStatus').innerHTML = '<span style="color:var(--danger)">Failed</span>';
-            }
-        };
+        function apiJson(path, opts) { return api(path, opts).then(function(r) { return r.json(); }); }
+        function apiPost(path, body) { return apiJson(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+        function apiPut(path, body) { return apiJson(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+        function apiPatch(path, body) { return apiJson(path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+        function apiDelete(path) { return apiJson(path, { method: 'DELETE' }); }
 
-        // Tabs
-        document.querySelectorAll('.tab-link').forEach(link => {
-            link.onclick = e => {
+        function showToast(msg, type) {
+            var d = document.createElement('div'); d.className = 'toast toast-' + (type||'success');
+            d.textContent = msg; document.body.appendChild(d); setTimeout(function() { d.remove(); }, 3000);
+        }
+
+        // ─── Tabs ────────────────────────────────
+        document.querySelectorAll('.tab-link').forEach(function(link) {
+            link.onclick = function(e) {
                 e.preventDefault();
-                document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-link').forEach(function(l) { l.classList.remove('active'); });
+                document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
                 link.classList.add('active');
-                document.getElementById(`tab-${link.dataset.tab}`).classList.add('active');
+                document.getElementById('tab-' + link.dataset.tab).classList.add('active');
             };
         });
 
-        // Overview: Stats
-        async function loadStats() {
-            try {
-                const s = await api.getKbStats();
-                document.getElementById('statEntities').textContent = s.entities;
-                document.getElementById('statRels').textContent = s.relationships;
-                document.getElementById('statChunks').textContent = s.chunks;
-                document.getElementById('statFiles').textContent = s.indexed_files;
-            } catch(e) {}
-        }
+        // ─── System tab ─────────────────────────
+        document.getElementById('sysToken').value = API_TOKEN;
+        document.getElementById('sysTokenSave').onclick = function() {
+            API_TOKEN = document.getElementById('sysToken').value.trim();
+            localStorage.setItem('api_token', API_TOKEN); showToast('Token saved');
+        };
+        document.getElementById('sysTokenTest').onclick = function() {
+            apiJson('/health').then(function() {
+                document.getElementById('sysTokenStatus').innerHTML = '<span style="color:var(--success)">Connected</span>';
+            }).catch(function() {
+                document.getElementById('sysTokenStatus').innerHTML = '<span style="color:var(--danger)">Failed</span>';
+            });
+        };
 
-        // Overview: Health
-        async function loadHealth() {
-            try {
-                const h = await api.getHealth();
-                const el = document.getElementById('healthStatus');
-                el.innerHTML = `
-                    <div class="circuit-row">
-                        <span class="circuit-name">Status</span>
-                        <span class="badge badge-success">${h.status}</span>
-                    </div>
-                    ${Object.entries(h.circuits).map(([k,v]) => `
-                        <div class="circuit-row">
-                            <span class="circuit-name">${k}</span>
-                            <span class="badge badge-${v === 'closed' ? 'success' : v === 'open' ? 'danger' : 'warning'}">${v}</span>
-                        </div>
-                    `).join('')}
-                `;
-            } catch(e) {
-                document.getElementById('healthStatus').innerHTML = '<span class="badge badge-danger">Disconnected</span>';
-            }
-        }
+        // ─── Overview ────────────────────────────
+        function loadStats() { apiJson('/kb/stats').then(function(s) { document.getElementById('statEntities').textContent=s.entities; document.getElementById('statRels').textContent=s.relationships; document.getElementById('statChunks').textContent=s.chunks; document.getElementById('statFiles').textContent=s.indexed_files; }).catch(function(){}); }
+        function loadHealth() { apiJson('/health').then(function(h) { var el=document.getElementById('healthStatus'); el.innerHTML='<div class="circuit-row"><span class="circuit-name">Status</span><span class="badge badge-success">'+h.status+'</span></div>'+Object.keys(h.circuits).map(function(k){var v=h.circuits[k];return '<div class="circuit-row"><span class="circuit-name">'+k+'</span><span class="badge badge-'+(v==='closed'?'success':v==='open'?'danger':'warning')+'">'+v+'</span></div>';}).join(''); }).catch(function(){document.getElementById('healthStatus').innerHTML='<span class="badge badge-danger">Disconnected</span>';}); }
+        function loadAgentInfo() { apiJson('/.well-known/agent.json').then(function(c) { document.getElementById('agentInfo').innerHTML='<div style="margin-bottom:8px"><strong>'+c.name+'</strong> v'+c.version+'</div><div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">'+c.description+'</div><div style="font-size:13px"><strong>Skills:</strong></div>'+c.skills.map(function(s){return '<div style="font-size:12px;padding:2px 0">- '+s.name+': '+s.description+'</div>';}).join(''); }).catch(function(){}); }
+        function loadMetrics() { api('/metrics').then(function(r){return r.text();}).then(function(raw) { var lines=raw.split('\n').filter(function(l){return l&&!l.startsWith('#');}); var tbody=document.querySelector('#metricsTable tbody'); tbody.innerHTML=''; lines.forEach(function(line){var m=line.match(/^(\w+)(\{[^}]*\})?\s+(.+)$/);if(!m)return;var name=m[1],labels=m[2]||'',val=m[3];if(name.includes('total')){var tr=document.createElement('tr');tr.innerHTML='<td style="font-family:monospace;font-size:12px">'+name+labels+'</td><td>'+parseFloat(val).toLocaleString()+'</td>';tbody.appendChild(tr);}}); }).catch(function(){}); }
 
-        // Overview: Agent info
-        async function loadAgentInfo() {
-            try {
-                const card = await api.getAgentCard();
-                document.getElementById('agentInfo').innerHTML = `
-                    <div style="margin-bottom:8px"><strong>${card.name}</strong> v${card.version}</div>
-                    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">${card.description}</div>
-                    <div style="font-size:13px"><strong>Skills:</strong></div>
-                    ${card.skills.map(s => `<div style="font-size:12px;padding:2px 0">- ${s.name}: ${s.description}</div>`).join('')}
-                `;
-            } catch(e) {}
-        }
+        // ─── KB ──────────────────────────────────
+        var currentFileFilter = '';
+        function loadFiles() { apiJson('/kb/files'+(currentFileFilter?'?status='+currentFileFilter:'')).then(function(d) { var tb=document.getElementById('filesTable'); var em=document.getElementById('filesEmpty'); tb.innerHTML=''; if(!d.files.length){em.style.display='block';return;} em.style.display='none'; d.files.forEach(function(f){var n=f.file_path?f.file_path.split('/').pop():f.file_path;var cls=f.status==='indexed'?'success':f.status==='failed'?'danger':'warning';var tr=document.createElement('tr');tr.innerHTML='<td title="'+f.file_path+'">'+n+'</td><td><span class="badge badge-'+cls+'">'+f.status+'</span></td><td>'+(f.entity_count||0)+'</td><td>'+(f.chunk_count||0)+'</td><td style="font-size:12px">'+(f.indexed_at||'-')+'</td><td style="font-size:12px;color:var(--danger)">'+(f.error_msg||'')+'</td>';tb.appendChild(tr);}); }).catch(function(){}); }
+        document.querySelectorAll('.file-filter').forEach(function(b){b.onclick=function(){document.querySelectorAll('.file-filter').forEach(function(x){x.classList.remove('active');});b.classList.add('active');currentFileFilter=b.dataset.status;loadFiles();};});
+        var uz=document.getElementById('uploadZone'),ui=document.getElementById('uploadInput');
+        uz.onclick=function(){ui.click();}; uz.ondragover=function(e){e.preventDefault();uz.classList.add('dragover');}; uz.ondragleave=function(){uz.classList.remove('dragover');}; uz.ondrop=function(e){e.preventDefault();uz.classList.remove('dragover');doUpload(e.dataTransfer.files);};
+        ui.onchange=function(){doUpload(ui.files);ui.value='';};
+        function doUpload(files) { if(!files.length)return; var st=document.getElementById('uploadStatus');st.innerHTML='<span class="spinner"></span> Uploading...'; var fd=new FormData();for(var i=0;i<files.length;i++)fd.append('files',files[i]); fetch('/api/kb/upload',{method:'POST',headers:{'Authorization':'Bearer '+API_TOKEN},body:fd}).then(function(r){return r.json();}).then(function(d){st.innerHTML='<span style="color:var(--success)">Uploaded '+d.uploaded+' file(s)</span>';showToast(d.uploaded+' file(s) uploaded');setTimeout(loadFiles,2000);}).catch(function(e){st.innerHTML='<span style="color:var(--danger)">Upload failed: '+e.message+'</span>';}); }
+        document.getElementById('syncBtn').onclick=function(){var b=this;b.disabled=true;b.innerHTML='<span class="spinner"></span>';apiPost('/kb/sync',{}).then(function(r){document.getElementById('syncStatus').textContent='Sync queued';showToast('Sync triggered');setTimeout(loadFiles,5000);}).catch(function(e){document.getElementById('syncStatus').textContent='Failed';}).finally(function(){b.disabled=false;b.textContent='Sync Knowledge Base';}); };
+        function loadEntities(s){apiJson('/kb/entities'+(s?'?search='+encodeURIComponent(s):'')).then(function(d){var tb=document.getElementById('entitiesTable');tb.innerHTML='';d.entities.forEach(function(e){var tr=document.createElement('tr');tr.innerHTML='<td><strong>'+e.name+'</strong></td><td><span class="badge badge-info">'+e.type+'</span></td><td style="font-size:13px;max-width:400px;overflow:hidden;text-overflow:ellipsis">'+(e.description||'-')+'</td><td style="font-size:12px">'+(e.media_type||'text')+'</td>';tb.appendChild(tr);});}).catch(function(){});}
+        document.getElementById('entitySearchBtn').onclick=function(){loadEntities(document.getElementById('entitySearch').value.trim());};
+        document.getElementById('entitySearch').onkeydown=function(e){if(e.key==='Enter')loadEntities(e.target.value.trim());};
 
-        // Overview: Metrics
-        async function loadMetrics() {
-            try {
-                const raw = await api.getMetrics();
-                const lines = raw.split('\n').filter(l => l && !l.startsWith('#'));
-                const interesting = ['kg_entities_total', 'kg_relationships_total', 'agent_tasks_total', 'llm_tokens_total'];
-                const tbody = document.querySelector('#metricsTable tbody');
-                tbody.innerHTML = '';
-                for (const line of lines) {
-                    const match = line.match(/^(\w+)(\{[^}]*\})?\s+(.+)$/);
-                    if (!match) continue;
-                    const [, name, labels, value] = match;
-                    if (interesting.some(m => name.startsWith(m)) || name.includes('total')) {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `<td style="font-family:monospace;font-size:12px">${name}${labels || ''}</td><td>${parseFloat(value).toLocaleString()}</td>`;
-                        tbody.appendChild(tr);
-                    }
-                }
-            } catch(e) {}
+        // ─── Agent Settings & Rules ──────────────
+        function loadAgentSettings() {
+            apiJson('/admin/agent/settings').then(function(s) {
+                document.getElementById('agentPrompt').value = s.system_prompt || '';
+                document.getElementById('agentPersonality').value = s.personality || '';
+                document.getElementById('agentLanguage').value = s.language || '';
+            }).catch(function(){});
         }
+        document.getElementById('saveSettingsBtn').onclick = function() {
+            apiPut('/admin/agent/settings', {
+                system_prompt: document.getElementById('agentPrompt').value,
+                personality: document.getElementById('agentPersonality').value,
+                language: document.getElementById('agentLanguage').value
+            }).then(function() { showToast('Settings saved'); document.getElementById('settingsStatus').innerHTML='<span style="color:var(--success)">Saved</span>'; })
+            .catch(function(e) { document.getElementById('settingsStatus').innerHTML='<span style="color:var(--danger)">Error: '+e.message+'</span>'; });
+        };
 
-        // KB: Files
-        let currentFileFilter = '';
-        async function loadFiles() {
-            try {
-                const data = await api.getKbFiles(currentFileFilter || undefined);
-                const tbody = document.getElementById('filesTable');
-                const empty = document.getElementById('filesEmpty');
-                tbody.innerHTML = '';
-                if (data.files.length === 0) {
-                    empty.style.display = 'block';
-                    return;
-                }
+        function loadRules() {
+            apiJson('/admin/agent/rules').then(function(d) {
+                var el = document.getElementById('rulesTable');
+                el.innerHTML = '';
+                if (!d.rules.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">No rules defined yet.</p>'; return; }
+                d.rules.forEach(function(r) {
+                    var div = document.createElement('div');
+                    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0';
+                    div.innerHTML = '<label class="toggle"><input type="checkbox" '+(r.enabled?'checked':'')+' data-id="'+r.id+'"><span class="toggle-slider"></span></label>'
+                        + '<span class="badge badge-info" style="font-size:11px">'+r.category+'</span>'
+                        + '<span style="flex:1;font-size:13px">'+(r.rule_text||'')+'</span>'
+                        + '<span style="font-size:11px;color:var(--text-muted)">P'+r.priority+'</span>'
+                        + '<button class="btn btn-sm btn-danger" data-del="'+r.id+'">&times;</button>';
+                    div.querySelector('input[type=checkbox]').onchange = function() {
+                        apiPatch('/admin/agent/rules/' + this.dataset.id, { enabled: this.checked }).then(function(){ showToast('Rule updated'); });
+                    };
+                    div.querySelector('[data-del]').onclick = function() {
+                        apiDelete('/admin/agent/rules/' + this.dataset.del).then(function(){ showToast('Rule deleted'); loadRules(); });
+                    };
+                    el.appendChild(div);
+                });
+            }).catch(function(){});
+        }
+        document.getElementById('addRuleBtn').onclick = function() {
+            var text = document.getElementById('newRuleText').value.trim();
+            if (!text) return;
+            apiPost('/admin/agent/rules', { rule_text: text, category: document.getElementById('newRuleCategory').value })
+            .then(function() { document.getElementById('newRuleText').value = ''; showToast('Rule added'); loadRules(); })
+            .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+        };
+        document.getElementById('newRuleText').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('addRuleBtn').click(); };
+
+        // ─── MCP Servers & Tools ─────────────────
+        function loadMcpServers() {
+            apiJson('/admin/mcp/servers').then(function(d) {
+                var list = document.getElementById('mcpServersList');
+                var empty = document.getElementById('mcpEmpty');
+                list.innerHTML = '';
+                if (!d.servers.length) { empty.style.display = 'block'; return; }
                 empty.style.display = 'none';
-                for (const f of data.files) {
-                    const name = f.file_path?.split('/').pop() || f.file_path;
-                    const statusCls = f.status === 'indexed' ? 'success' : f.status === 'failed' ? 'danger' : 'warning';
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td title="${f.file_path}">${name}</td>
-                        <td><span class="badge badge-${statusCls}">${f.status}</span></td>
-                        <td>${f.entity_count || 0}</td>
-                        <td>${f.chunk_count || 0}</td>
-                        <td style="font-size:12px">${f.indexed_at || '-'}</td>
-                        <td style="font-size:12px;color:var(--danger)">${f.error_msg || ''}</td>
-                    `;
-                    tbody.appendChild(tr);
-                }
-            } catch(e) {}
+                d.servers.forEach(function(srv) {
+                    var card = document.createElement('div');
+                    card.className = 'mcp-server-card';
+                    var statusCls = srv.status === 'connected' ? 'success' : srv.status === 'error' ? 'danger' : 'warning';
+                    var toolsHtml = '';
+                    if (srv.tools && srv.tools.length) {
+                        toolsHtml = '<div style="margin-top:12px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">TOOLS (' + srv.tools.length + ')</div>';
+                        srv.tools.forEach(function(t) {
+                            toolsHtml += '<div class="mcp-tool-row"><span><strong>' + t.tool_name + '</strong> — ' + (t.description || '').slice(0, 80) + '</span>'
+                                + '<label class="toggle"><input type="checkbox" ' + (t.enabled ? 'checked' : '') + ' data-tool-id="' + t.id + '"><span class="toggle-slider"></span></label></div>';
+                        });
+                        toolsHtml += '</div>';
+                    } else {
+                        toolsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">No tools discovered. Try refreshing.</div>';
+                    }
+                    card.innerHTML = '<div class="mcp-server-header"><div><strong>' + srv.name + '</strong> <span class="badge badge-' + statusCls + '">' + srv.status + '</span></div>'
+                        + '<div style="display:flex;gap:6px"><label class="toggle"><input type="checkbox" ' + (srv.enabled ? 'checked' : '') + ' data-srv-toggle="' + srv.id + '"><span class="toggle-slider"></span></label>'
+                        + '<button class="btn btn-sm btn-secondary" data-srv-refresh="' + srv.id + '">Refresh</button>'
+                        + '<button class="btn btn-sm btn-danger" data-srv-del="' + srv.id + '">&times;</button></div></div>'
+                        + '<div style="font-size:12px;color:var(--text-muted)">' + srv.url + (srv.error_msg ? ' — <span style="color:var(--danger)">' + srv.error_msg + '</span>' : '') + '</div>'
+                        + toolsHtml;
+
+                    // Event handlers
+                    card.querySelectorAll('[data-tool-id]').forEach(function(cb) {
+                        cb.onchange = function() { apiPatch('/admin/mcp/tools/' + this.dataset.toolId, { enabled: this.checked }).then(function(){ showToast('Tool updated'); }); };
+                    });
+                    var toggleEl = card.querySelector('[data-srv-toggle]');
+                    if (toggleEl) toggleEl.onchange = function() { apiPatch('/admin/mcp/servers/' + this.dataset.srvToggle, { enabled: this.checked }).then(function(){ showToast('Server updated'); }); };
+                    var refreshEl = card.querySelector('[data-srv-refresh]');
+                    if (refreshEl) refreshEl.onclick = function() { var id=this.dataset.srvRefresh; this.textContent='...'; apiPost('/admin/mcp/servers/'+id+'/refresh',{}).then(function(r){showToast('Discovered '+r.tools_discovered+' tools');loadMcpServers();}).catch(function(e){showToast('Refresh failed','error');}); };
+                    var delEl = card.querySelector('[data-srv-del]');
+                    if (delEl) delEl.onclick = function() { apiDelete('/admin/mcp/servers/' + this.dataset.srvDel).then(function(){ showToast('Server removed'); loadMcpServers(); }); };
+
+                    list.appendChild(card);
+                });
+            }).catch(function(){});
         }
-
-        document.querySelectorAll('.file-filter').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.file-filter').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFileFilter = btn.dataset.status;
-                loadFiles();
-            };
-        });
-
-        // KB: Upload
-        const uploadZone = document.getElementById('uploadZone');
-        const uploadInput = document.getElementById('uploadInput');
-
-        uploadZone.onclick = () => uploadInput.click();
-        uploadZone.ondragover = e => { e.preventDefault(); uploadZone.classList.add('dragover'); };
-        uploadZone.ondragleave = () => uploadZone.classList.remove('dragover');
-        uploadZone.ondrop = async e => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            await doUpload(e.dataTransfer.files);
-        };
-        uploadInput.onchange = async () => { await doUpload(uploadInput.files); uploadInput.value = ''; };
-
-        async function doUpload(files) {
-            if (!files.length) return;
-            const status = document.getElementById('uploadStatus');
-            status.innerHTML = `<span class="spinner"></span> Uploading ${files.length} file(s)...`;
-            try {
-                const res = await api.uploadFiles(files);
-                status.innerHTML = `<span style="color:var(--success)">Uploaded ${res.uploaded} file(s)</span>`;
-                showToast(`${res.uploaded} file(s) uploaded`, 'success');
-                setTimeout(loadFiles, 2000);
-            } catch(e) {
-                status.innerHTML = `<span style="color:var(--danger)">Upload failed: ${e.message}</span>`;
-            }
-        }
-
-        // KB: Sync
-        document.getElementById('syncBtn').onclick = async () => {
-            const btn = document.getElementById('syncBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Syncing...';
-            try {
-                const res = await api.triggerSync();
-                document.getElementById('syncStatus').textContent = `Sync queued (task: ${res.task_id?.slice(0,8)}...)`;
-                showToast('Sync triggered', 'success');
-                setTimeout(loadFiles, 5000);
-                setTimeout(loadStats, 5000);
-            } catch(e) {
-                document.getElementById('syncStatus').textContent = `Sync failed: ${e.message}`;
-            }
-            btn.disabled = false;
-            btn.textContent = 'Sync Knowledge Base';
+        document.getElementById('addMcpBtn').onclick = function() {
+            var name = document.getElementById('mcpName').value.trim();
+            var url = document.getElementById('mcpUrl').value.trim();
+            var key = document.getElementById('mcpApiKey').value.trim();
+            if (!name || !url) { showToast('Name and URL required', 'error'); return; }
+            var st = document.getElementById('mcpAddStatus');
+            st.innerHTML = '<span class="spinner"></span> Connecting...';
+            apiPost('/admin/mcp/servers', { name: name, url: url, api_key: key || null })
+            .then(function(r) { st.innerHTML = '<span style="color:var(--success)">Added! ' + r.tools_discovered + ' tools discovered</span>';
+                document.getElementById('mcpName').value = ''; document.getElementById('mcpUrl').value = ''; document.getElementById('mcpApiKey').value = '';
+                loadMcpServers(); })
+            .catch(function(e) { st.innerHTML = '<span style="color:var(--danger)">Failed: ' + e.message + '</span>'; });
         };
 
-        // KB: Entities
-        async function loadEntities(search) {
-            try {
-                const data = await api.getEntities(search);
-                const tbody = document.getElementById('entitiesTable');
-                tbody.innerHTML = '';
-                for (const e of data.entities) {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><strong>${e.name}</strong></td>
-                        <td><span class="badge badge-info">${e.type}</span></td>
-                        <td style="font-size:13px;max-width:400px;overflow:hidden;text-overflow:ellipsis">${e.description || '-'}</td>
-                        <td style="font-size:12px">${e.media_type || 'text'}</td>
-                    `;
-                    tbody.appendChild(tr);
-                }
-            } catch(e) {}
-        }
+        // ─── Config ──────────────────────────────
+        function loadConfig() { apiJson('/.well-known/agent.json').then(function(c){return apiJson('/kb/stats').then(function(s){document.getElementById('configInfo').innerHTML='<div><strong>Agent:</strong> '+c.name+' v'+c.version+'</div><div><strong>Skills:</strong> '+(c.skills?c.skills.length:0)+'</div><div><strong>KB:</strong> '+s.entities+' entities, '+s.relationships+' rels, '+s.chunks+' chunks</div><div><strong>Input:</strong> '+(c.defaultInputModes||[]).join(', ')+'</div>';});}).catch(function(){}); }
 
-        document.getElementById('entitySearchBtn').onclick = () => {
-            loadEntities(document.getElementById('entitySearch').value.trim());
-        };
-        document.getElementById('entitySearch').onkeydown = e => {
-            if (e.key === 'Enter') loadEntities(e.target.value.trim());
-        };
-
-        // System: Config
-        async function loadConfig() {
-            try {
-                const card = await api.getAgentCard();
-                const stats = await api.getKbStats();
-                document.getElementById('configInfo').innerHTML = `
-                    <div><strong>Agent:</strong> ${card.name} v${card.version}</div>
-                    <div><strong>Capabilities:</strong> streaming=${card.capabilities?.streaming}, push=${card.capabilities?.pushNotifications}</div>
-                    <div><strong>Skills:</strong> ${card.skills?.length || 0}</div>
-                    <div><strong>KB Size:</strong> ${stats.entities} entities, ${stats.relationships} rels, ${stats.chunks} chunks</div>
-                    <div><strong>Input Modes:</strong> ${card.defaultInputModes?.join(', ')}</div>
-                    <div><strong>Output Modes:</strong> ${card.defaultOutputModes?.join(', ')}</div>
-                `;
-            } catch(e) {}
-        }
-
-        // Toast
-        function showToast(msg, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            toast.textContent = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
-
-        // Init
-        loadStats(); loadHealth(); loadAgentInfo(); loadMetrics(); loadFiles(); loadEntities(); loadConfig();
-        setInterval(() => { loadStats(); loadHealth(); loadMetrics(); }, 15000);
+        // ─── Init ────────────────────────────────
+        loadStats(); loadHealth(); loadAgentInfo(); loadMetrics(); loadFiles(); loadEntities();
+        loadConfig(); loadAgentSettings(); loadRules(); loadMcpServers();
+        setInterval(function() { loadStats(); loadHealth(); loadMetrics(); }, 15000);
     </script>
 </body>
 </html>

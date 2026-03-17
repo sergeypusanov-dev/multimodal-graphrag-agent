@@ -91,13 +91,42 @@ def media_context_node(state: AgentState) -> dict:
                               "segments":f.get("segments",[])})
     return {"media_context":media_ctx}
 
+def build_system_prompt() -> str:
+    try:
+        from database import get_db
+        db = get_db()
+        settings = db.fetchone("SELECT system_prompt, personality, language FROM agent_settings WHERE id=1")
+        rules = db.fetch("SELECT rule_text FROM agent_rules WHERE enabled=TRUE ORDER BY priority DESC, created_at")
+    except Exception:
+        settings = None
+        rules = []
+
+    parts = []
+    base = (settings or {}).get("system_prompt", "").strip() if settings else ""
+    if base:
+        parts.append(base)
+    else:
+        parts.append("You are a multimodal research assistant with a temporal knowledge graph. "
+                      "Answer in the user's language. Cite [source: X] for every factual claim.")
+
+    if settings and settings.get("personality"):
+        parts.append(f"Personality: {settings['personality']}")
+    if settings and settings.get("language"):
+        parts.append(f"Language: {settings['language']}")
+
+    if rules:
+        parts.append("Rules you MUST follow:")
+        for r in rules:
+            parts.append(f"- {r['rule_text']}")
+
+    return "\n\n".join(parts)
+
 def synthesize_node(state: AgentState) -> dict:
     from llm.adapter import main_llm
     from security.middleware import llm_circuit
     from cache.manager import cache_mgr
     images = [m["data"] for m in state.get("media_context",[]) if m.get("type")=="image"]
-    system = ("You are a multimodal research assistant with a temporal knowledge graph. "
-              "Answer in the user's language. Cite [source: X] for every factual claim.")
+    system = build_system_prompt()
     user_text = (f"Knowledge graph context:\n{state.get('graph_context','No context.')}\n\n"
                  f"Query: {state['input_text']}")
     if images:

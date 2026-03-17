@@ -170,3 +170,217 @@ async def kb_entities(limit: int = 50, offset: int = 0, search: Optional[str] = 
         if r.get("id"): r["id"] = str(r["id"])
         if r.get("created_at"): r["created_at"] = str(r["created_at"])
     return {"entities": rows}
+
+# ═══════════════════════════════════════════════════════
+# AGENT SETTINGS & RULES
+# ═══════════════════════════════════════════════════════
+
+@app.get("/admin/agent/settings")
+async def get_agent_settings():
+    from database import get_db
+    db = get_db()
+    row = db.fetchone("SELECT system_prompt, personality, language, updated_at FROM agent_settings WHERE id=1")
+    if row and row.get("updated_at"): row["updated_at"] = str(row["updated_at"])
+    return row or {"system_prompt": "", "personality": "", "language": ""}
+
+class AgentSettingsUpdate(BaseModel):
+    system_prompt: Optional[str] = None
+    personality: Optional[str] = None
+    language: Optional[str] = None
+
+@app.put("/admin/agent/settings")
+async def update_agent_settings(
+    req: AgentSettingsUpdate,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    db.execute("""UPDATE agent_settings SET system_prompt=COALESCE(%s, system_prompt),
+                  personality=COALESCE(%s, personality), language=COALESCE(%s, language),
+                  updated_at=NOW() WHERE id=1""",
+               [req.system_prompt, req.personality, req.language])
+    return {"status": "ok"}
+
+@app.get("/admin/agent/rules")
+async def get_agent_rules():
+    from database import get_db
+    db = get_db()
+    rows = db.fetch("SELECT id, rule_text, category, enabled, priority, created_at FROM agent_rules ORDER BY priority DESC, created_at")
+    for r in rows:
+        if r.get("id"): r["id"] = str(r["id"])
+        if r.get("created_at"): r["created_at"] = str(r["created_at"])
+    return {"rules": rows}
+
+class AgentRuleCreate(BaseModel):
+    rule_text: str
+    category: str = "general"
+    priority: int = 0
+
+@app.post("/admin/agent/rules")
+async def create_agent_rule(
+    req: AgentRuleCreate,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    db.execute("INSERT INTO agent_rules (rule_text, category, priority) VALUES (%s, %s, %s)",
+               [req.rule_text, req.category, req.priority])
+    return {"status": "ok"}
+
+class AgentRuleUpdate(BaseModel):
+    rule_text: Optional[str] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+
+@app.patch("/admin/agent/rules/{rule_id}")
+async def update_agent_rule(
+    rule_id: str,
+    req: AgentRuleUpdate,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    if req.rule_text is not None:
+        db.execute("UPDATE agent_rules SET rule_text=%s WHERE id=%s", [req.rule_text, rule_id])
+    if req.enabled is not None:
+        db.execute("UPDATE agent_rules SET enabled=%s WHERE id=%s", [req.enabled, rule_id])
+    if req.priority is not None:
+        db.execute("UPDATE agent_rules SET priority=%s WHERE id=%s", [req.priority, rule_id])
+    return {"status": "ok"}
+
+@app.delete("/admin/agent/rules/{rule_id}")
+async def delete_agent_rule(
+    rule_id: str,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    db.execute("DELETE FROM agent_rules WHERE id=%s", [rule_id])
+    return {"status": "ok"}
+
+# ═══════════════════════════════════════════════════════
+# MCP SERVERS & TOOLS
+# ═══════════════════════════════════════════════════════
+
+@app.get("/admin/mcp/servers")
+async def get_mcp_servers():
+    from database import get_db
+    db = get_db()
+    servers = db.fetch("SELECT id, name, url, enabled, status, last_check, error_msg, created_at FROM mcp_servers ORDER BY created_at")
+    for s in servers:
+        for k in ("id", "last_check", "created_at"):
+            if s.get(k): s[k] = str(s[k])
+        tools = db.fetch("SELECT id, tool_name, description, enabled FROM mcp_tools WHERE server_id=%s", [s["id"]])
+        for t in tools:
+            if t.get("id"): t["id"] = str(t["id"])
+        s["tools"] = tools
+    return {"servers": servers}
+
+class McpServerCreate(BaseModel):
+    name: str
+    url: str
+    api_key: Optional[str] = None
+
+@app.post("/admin/mcp/servers")
+async def add_mcp_server(
+    req: McpServerCreate,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    import uuid
+    sid = str(uuid.uuid4())
+    db.execute("INSERT INTO mcp_servers (id, name, url, api_key) VALUES (%s, %s, %s, %s)",
+               [sid, req.name, req.url, req.api_key])
+    # Try to discover tools
+    tools = await _discover_mcp_tools(sid, req.url, req.api_key, db)
+    return {"id": sid, "status": "ok", "tools_discovered": len(tools)}
+
+@app.delete("/admin/mcp/servers/{server_id}")
+async def delete_mcp_server(
+    server_id: str,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    db.execute("DELETE FROM mcp_servers WHERE id=%s", [server_id])
+    return {"status": "ok"}
+
+@app.patch("/admin/mcp/servers/{server_id}")
+async def update_mcp_server(
+    server_id: str,
+    req: dict,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    if "enabled" in req:
+        db.execute("UPDATE mcp_servers SET enabled=%s WHERE id=%s", [req["enabled"], server_id])
+    if "name" in req:
+        db.execute("UPDATE mcp_servers SET name=%s WHERE id=%s", [req["name"], server_id])
+    return {"status": "ok"}
+
+@app.post("/admin/mcp/servers/{server_id}/refresh")
+async def refresh_mcp_server(
+    server_id: str,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    srv = db.fetchone("SELECT url, api_key FROM mcp_servers WHERE id=%s", [server_id])
+    if not srv:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Server not found")
+    tools = await _discover_mcp_tools(server_id, srv["url"], srv.get("api_key"), db)
+    return {"status": "ok", "tools_discovered": len(tools)}
+
+@app.patch("/admin/mcp/tools/{tool_id}")
+async def update_mcp_tool(
+    tool_id: str,
+    req: dict,
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    if "enabled" in req:
+        db.execute("UPDATE mcp_tools SET enabled=%s WHERE id=%s", [req["enabled"], tool_id])
+    return {"status": "ok"}
+
+async def _discover_mcp_tools(server_id: str, url: str, api_key: str, db) -> list:
+    """Try to connect to MCP server and discover available tools."""
+    import httpx, json
+    tools = []
+    try:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Try standard MCP tool listing endpoints
+            for endpoint in ["/tools/list", "/tools", "/api/tools"]:
+                try:
+                    r = await client.post(url.rstrip("/") + endpoint,
+                                          json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+                                          headers=headers)
+                    if r.status_code == 200:
+                        data = r.json()
+                        tool_list = data.get("result", {}).get("tools", data.get("tools", []))
+                        for t in tool_list:
+                            db.execute("""INSERT INTO mcp_tools (server_id, tool_name, description, input_schema)
+                                          VALUES (%s, %s, %s, %s)
+                                          ON CONFLICT (server_id, tool_name) DO UPDATE
+                                          SET description=%s, input_schema=%s""",
+                                       [server_id, t.get("name", ""), t.get("description", ""),
+                                        json.dumps(t.get("inputSchema", t.get("input_schema", {}))),
+                                        t.get("description", ""),
+                                        json.dumps(t.get("inputSchema", t.get("input_schema", {})))])
+                            tools.append(t)
+                        break
+                except Exception:
+                    continue
+        status = "connected" if tools else "connected (no tools)"
+        db.execute("UPDATE mcp_servers SET status=%s, last_check=NOW(), error_msg=NULL WHERE id=%s",
+                   [status, server_id])
+    except Exception as e:
+        db.execute("UPDATE mcp_servers SET status='error', last_check=NOW(), error_msg=%s WHERE id=%s",
+                   [str(e)[:500], server_id])
+    return tools
