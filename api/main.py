@@ -347,40 +347,121 @@ async def update_mcp_tool(
     return {"status": "ok"}
 
 async def _discover_mcp_tools(server_id: str, url: str, api_key: str, db) -> list:
-    """Try to connect to MCP server and discover available tools."""
-    import httpx, json
+    """Connect to MCP server via SSE or HTTP and discover available tools."""
+    import httpx, json, asyncio
     tools = []
     try:
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-        async with httpx.AsyncClient(timeout=15) as client:
-            # Try standard MCP tool listing endpoints
-            for endpoint in ["/tools/list", "/tools", "/api/tools"]:
-                try:
-                    r = await client.post(url.rstrip("/") + endpoint,
-                                          json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
-                                          headers=headers)
-                    if r.status_code == 200:
-                        data = r.json()
-                        tool_list = data.get("result", {}).get("tools", data.get("tools", []))
-                        for t in tool_list:
-                            db.execute("""INSERT INTO mcp_tools (server_id, tool_name, description, input_schema)
-                                          VALUES (%s, %s, %s, %s)
-                                          ON CONFLICT (server_id, tool_name) DO UPDATE
-                                          SET description=%s, input_schema=%s""",
-                                       [server_id, t.get("name", ""), t.get("description", ""),
-                                        json.dumps(t.get("inputSchema", t.get("input_schema", {}))),
-                                        t.get("description", ""),
-                                        json.dumps(t.get("inputSchema", t.get("input_schema", {})))])
-                            tools.append(t)
-                        break
-                except Exception:
-                    continue
+
+        # Detect transport: if URL ends with /sse, use SSE transport
+        if url.rstrip("/").endswith("/sse"):
+            tools = await _discover_via_sse(url, headers)
+        else:
+            tools = await _discover_via_http(url, headers)
+
+        # Save tools to DB
+        for t in tools:
+            db.execute("""INSERT INTO mcp_tools (server_id, tool_name, description, input_schema)
+                          VALUES (%s, %s, %s, %s)
+                          ON CONFLICT (server_id, tool_name) DO UPDATE
+                          SET description=%s, input_schema=%s""",
+                       [server_id, t.get("name", ""), t.get("description", ""),
+                        json.dumps(t.get("inputSchema", t.get("input_schema", {}))),
+                        t.get("description", ""),
+                        json.dumps(t.get("inputSchema", t.get("input_schema", {})))])
+
         status = "connected" if tools else "connected (no tools)"
         db.execute("UPDATE mcp_servers SET status=%s, last_check=NOW(), error_msg=NULL WHERE id=%s",
                    [status, server_id])
     except Exception as e:
+        import traceback, logging
+        logging.error(f"MCP discover error: {traceback.format_exc()}")
         db.execute("UPDATE mcp_servers SET status='error', last_check=NOW(), error_msg=%s WHERE id=%s",
                    [str(e)[:500], server_id])
     return tools
+
+
+async def _discover_via_sse(url: str, headers: dict) -> list:
+    """MCP SSE transport: full handshake — initialize, notifications/initialized, tools/list."""
+    import aiohttp, json
+
+    base_url = url.rsplit("/sse", 1)[0]
+    # Add Host header for servers that validate it
+    parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(url)
+    host_header = parsed.netloc
+    if host_header:
+        headers = {**headers, "Host": host_header}
+
+    # Replace localhost with host.docker.internal for Docker compatibility
+    docker_url = url.replace("://localhost", "://host.docker.internal")
+    docker_base = docker_url.rsplit("/sse", 1)[0]
+
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(docker_url) as sse:
+            ep = None
+            initialized = False
+            tools = []
+
+            async for raw_line in sse.content:
+                text = raw_line.decode("utf-8", errors="ignore").strip()
+                if not text:
+                    continue
+
+                if text.startswith("data: ") and "/messages/" in text and not ep:
+                    ep = text[6:].strip()
+                    # Step 1: initialize
+                    await session.post(docker_base + ep, json={
+                        "jsonrpc": "2.0", "method": "initialize", "id": 1,
+                        "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": "graphrag-agent", "version": "1.0.0"}
+                        }
+                    })
+
+                elif text.startswith("data: ") and ep:
+                    data = text[6:].strip()
+                    try:
+                        msg = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+
+                    # Step 2: after initialize response, send initialized + tools/list
+                    if msg.get("id") == 1 and "result" in msg and not initialized:
+                        initialized = True
+                        await session.post(docker_base + ep, json={
+                            "jsonrpc": "2.0", "method": "notifications/initialized"
+                        })
+                        await session.post(docker_base + ep, json={
+                            "jsonrpc": "2.0", "method": "tools/list", "id": 2
+                        })
+
+                    # Step 3: receive tools/list response
+                    elif msg.get("id") == 2 and "result" in msg:
+                        tools = msg["result"].get("tools", [])
+                        return tools
+
+    return []
+
+
+async def _discover_via_http(url: str, headers: dict) -> list:
+    """Try direct HTTP JSON-RPC endpoints."""
+    import httpx, json
+
+    async with httpx.AsyncClient(timeout=15, headers=headers) as client:
+        for endpoint in ["/tools/list", "/tools", "/api/tools", ""]:
+            try:
+                target = url.rstrip("/") + endpoint
+                r = await client.post(target,
+                                      json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+                                      headers={"Content-Type": "application/json"})
+                if r.status_code == 200:
+                    data = r.json()
+                    tool_list = data.get("result", {}).get("tools", data.get("tools", []))
+                    if tool_list:
+                        return tool_list
+            except Exception:
+                continue
+    return []
