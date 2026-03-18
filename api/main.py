@@ -99,6 +99,15 @@ async def health():
 async def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+@app.get("/admin/specialists")
+async def get_specialists():
+    from agent.orchestrator import SPECIALISTS
+    return {"specialists": [
+        {"key": k, "name": v["name"], "description": v["description"],
+         "tools_count": len(v["tool_patterns"]), "keywords_sample": v["keywords"][:5]}
+        for k, v in SPECIALISTS.items()
+    ]}
+
 @app.get("/kb/stats")
 async def kb_stats():
     from database import get_db

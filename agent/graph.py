@@ -132,6 +132,10 @@ def synthesize_node(state: AgentState) -> dict:
     user_text = (f"Knowledge graph context:\n{state.get('graph_context','No context.')}\n\n"
                  f"Query: {state['input_text']}")
 
+    # ─── Orchestrator: route to specialist ───
+    from agent.orchestrator import (classify_specialist, get_specialist_tools,
+                                    get_specialist_prompt, get_specialist_name)
+
     # Load MCP tools
     mcp_tools, mcp_tool_map = [], {}
     try:
@@ -140,55 +144,25 @@ def synthesize_node(state: AgentState) -> dict:
     except Exception as e:
         logging.warning(f"Failed to load MCP tools: {e}")
 
-    # Select relevant MCP tools (max 15 to stay within context limits)
-    if mcp_tools and len(mcp_tools) <= 15:
-        all_tools = mcp_tools
-    elif mcp_tools:
-        query_lower = state["input_text"].lower()
-        # Detect server prefixes mentioned in query
-        prefixes = set()
-        keyword_map = {
-            "wildberries": "wb_", "wb": "wb_", "вб": "wb_", "вайлдберриз": "wb_",
-            "баланс": "balance", "продаж": "sales", "заказ": "order", "цен": "price",
-            "склад": "stock", "warehouse": "warehouse", "поставк": "supply",
-            "возврат": "return", "отчёт": "report", "отчет": "report",
-            "карточ": "card", "товар": "product", "категори": "categor",
-        }
-        search_terms = set()
-        for keyword, term in keyword_map.items():
-            if keyword in query_lower:
-                if term.endswith("_"):
-                    prefixes.add(term)
-                else:
-                    search_terms.add(term)
+    # Classify query and select specialist
+    specialist = classify_specialist(state["input_text"])
+    all_tools = get_specialist_tools(specialist, mcp_tools) if mcp_tools else None
+    specialist_prompt = get_specialist_prompt(specialist)
+    specialist_name = get_specialist_name(specialist)
 
-        selected = []
-        for t in mcp_tools:
-            name = t["function"]["name"].lower()
-            desc = (t["function"].get("description") or "").lower()
-            # Include if prefix matches
-            if any(name.startswith(p) for p in prefixes):
-                # Further filter by search terms if any
-                if search_terms:
-                    if any(term in name or term in desc for term in search_terms):
-                        selected.append(t)
-                else:
-                    selected.append(t)
-            # Include if search term matches directly
-            elif any(term in name or term in desc for term in search_terms):
-                selected.append(t)
+    print(f"[ORCH] Specialist: {specialist_name} ({specialist}), tools: {len(all_tools or [])}", flush=True)
 
-        all_tools = selected[:15] if selected else mcp_tools[:10]
-    else:
-        all_tools = None
+    # Build system prompt: base rules + specialist persona
+    if specialist_prompt:
+        system = system + "\n\n" + specialist_prompt
 
-    # Add tool usage instruction to system prompt
+    # Add tool list to prompt
     if all_tools:
         tool_list = "\n".join(f"- {t['function']['name']}: {(t['function'].get('description') or '')[:80]}"
                                for t in all_tools)
-        system += (f"\n\nYou have access to {len(all_tools)} external tools. "
-                   "You MUST call the appropriate tool when the user asks for real-time data "
-                   "like balance, sales, orders, prices, stocks, etc.\n"
+        system += (f"\n\nYou have access to {len(all_tools)} Wildberries tools. "
+                   "You MUST call the appropriate tool to get real-time data. "
+                   "Do NOT say you can't access data — use the tools.\n"
                    f"Available tools:\n{tool_list}")
 
     # Build messages
