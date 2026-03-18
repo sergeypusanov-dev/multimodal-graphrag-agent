@@ -46,15 +46,29 @@ def call_mcp_tool(tool_name: str, arguments: dict, tool_map: dict) -> str:
         return f"Error: unknown MCP tool '{tool_name}'"
 
     try:
-        loop = asyncio.new_event_loop()
-        result = loop.run_until_complete(
-            _call_mcp_tool_async(server["url"], server.get("api_key"), tool_name, arguments)
-        )
-        loop.close()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(_run_async_tool,
+                                 server["url"], server.get("api_key"), tool_name, arguments)
+            result = future.result(timeout=60)
         return result
+    except concurrent.futures.TimeoutError:
+        return f"MCP tool {tool_name} timed out (60s)"
     except Exception as e:
-        logger.error(f"MCP tool {tool_name} failed: {e}")
+        logger.error(f"MCP tool {tool_name} failed: {e}", exc_info=True)
         return f"Error calling {tool_name}: {e}"
+
+
+def _run_async_tool(url, api_key, tool_name, arguments):
+    """Run async MCP call in a new event loop in a separate thread."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(
+            _call_mcp_tool_async(url, api_key, tool_name, arguments)
+        )
+    finally:
+        loop.close()
 
 
 async def _call_mcp_tool_async(url: str, api_key: str, tool_name: str, arguments: dict) -> str:
