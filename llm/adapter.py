@@ -6,6 +6,8 @@ config = yaml.safe_load(open("config.yaml"))
 @dataclass
 class LLMResponse:
     text: str; model: str; tokens_in: int; tokens_out: int; provider: str
+    tool_calls: list = None  # list of {id, name, arguments}
+    raw_message: object = None  # original message for tool call loop
 
 class LLMAdapter:
     def __init__(self, role: str = "main"):
@@ -63,8 +65,14 @@ class LLMAdapter:
                       max_tokens=max_tok, temperature=temp)
             if tools: kw["tools"] = tools
             r = self.client.chat.completions.create(**kw)
-            return LLMResponse(r.choices[0].message.content, r.model,
-                               r.usage.prompt_tokens, r.usage.completion_tokens, self.provider)
+            msg = r.choices[0].message
+            tc = None
+            if msg.tool_calls:
+                tc = [{"id": t.id, "name": t.function.name,
+                       "arguments": t.function.arguments} for t in msg.tool_calls]
+            return LLMResponse(msg.content or "", r.model,
+                               r.usage.prompt_tokens, r.usage.completion_tokens, self.provider,
+                               tool_calls=tc, raw_message=msg)
         elif self.provider == "gemini":
             prompt = "\n".join(m["content"] for m in messages)
             if system: prompt = f"{system}\n\n{prompt}"

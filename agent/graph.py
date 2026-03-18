@@ -125,21 +125,137 @@ def synthesize_node(state: AgentState) -> dict:
     from llm.adapter import main_llm
     from security.middleware import llm_circuit
     from cache.manager import cache_mgr
+    import json, logging
+
     images = [m["data"] for m in state.get("media_context",[]) if m.get("type")=="image"]
     system = build_system_prompt()
     user_text = (f"Knowledge graph context:\n{state.get('graph_context','No context.')}\n\n"
                  f"Query: {state['input_text']}")
-    if images:
-        response = llm_circuit.call(main_llm.chat_with_vision, user_text, images, system)
+
+    # Load MCP tools
+    mcp_tools, mcp_tool_map = [], {}
+    try:
+        from mcp.client import get_enabled_mcp_tools
+        mcp_tools, mcp_tool_map = get_enabled_mcp_tools()
+    except Exception as e:
+        logging.warning(f"Failed to load MCP tools: {e}")
+
+    # Select relevant MCP tools (max 15 to stay within context limits)
+    if mcp_tools and len(mcp_tools) <= 15:
+        all_tools = mcp_tools
+    elif mcp_tools:
+        query_lower = state["input_text"].lower()
+        # Detect server prefixes mentioned in query
+        prefixes = set()
+        keyword_map = {
+            "wildberries": "wb_", "wb": "wb_", "вб": "wb_", "вайлдберриз": "wb_",
+            "баланс": "balance", "продаж": "sales", "заказ": "order", "цен": "price",
+            "склад": "stock", "warehouse": "warehouse", "поставк": "supply",
+            "возврат": "return", "отчёт": "report", "отчет": "report",
+            "карточ": "card", "товар": "product", "категори": "categor",
+        }
+        search_terms = set()
+        for keyword, term in keyword_map.items():
+            if keyword in query_lower:
+                if term.endswith("_"):
+                    prefixes.add(term)
+                else:
+                    search_terms.add(term)
+
+        selected = []
+        for t in mcp_tools:
+            name = t["function"]["name"].lower()
+            desc = (t["function"].get("description") or "").lower()
+            # Include if prefix matches
+            if any(name.startswith(p) for p in prefixes):
+                # Further filter by search terms if any
+                if search_terms:
+                    if any(term in name or term in desc for term in search_terms):
+                        selected.append(t)
+                else:
+                    selected.append(t)
+            # Include if search term matches directly
+            elif any(term in name or term in desc for term in search_terms):
+                selected.append(t)
+
+        all_tools = selected[:15] if selected else mcp_tools[:10]
     else:
-        response = llm_circuit.call(main_llm.chat,[{"role":"user","content":user_text}],system)
-    answer = response.text
+        all_tools = None
+
+    # Add tool usage instruction to system prompt
+    if all_tools:
+        tool_list = "\n".join(f"- {t['function']['name']}: {(t['function'].get('description') or '')[:80]}"
+                               for t in all_tools)
+        system += (f"\n\nYou have access to {len(all_tools)} external tools. "
+                   "You MUST call the appropriate tool when the user asks for real-time data "
+                   "like balance, sales, orders, prices, stocks, etc.\n"
+                   f"Available tools:\n{tool_list}")
+
+    # Build messages
+    messages = [{"role": "user", "content": user_text}]
+
+    # Tool call loop (max 5 iterations)
+    answer = ""
+    response = None
+    for iteration in range(5):
+        if images and iteration == 0:
+            response = llm_circuit.call(main_llm.chat_with_vision, user_text, images, system)
+        else:
+            response = llm_circuit.call(main_llm.chat, messages, system, all_tools)
+
+        print(f"[SYNTH] iter={iteration} tool_calls={response.tool_calls is not None} text_len={len(response.text or '')}", flush=True)
+
+        # If no tool calls, we have the final answer
+        if not response.tool_calls:
+            answer = response.text
+            break
+
+        # Process tool calls
+        print(f"[SYNTH] LLM requested {len(response.tool_calls)} tool call(s)", flush=True)
+
+        # Add assistant message with tool calls (serialized)
+        assistant_msg = {"role": "assistant", "content": response.text or "",
+                         "tool_calls": [{"id": tc["id"], "type": "function",
+                                         "function": {"name": tc["name"], "arguments": tc["arguments"]}}
+                                        for tc in response.tool_calls]}
+        messages.append(assistant_msg)
+
+        for tc in response.tool_calls:
+            tool_name = tc["name"]
+            try:
+                args = json.loads(tc["arguments"]) if isinstance(tc["arguments"], str) else tc["arguments"]
+            except json.JSONDecodeError:
+                args = {}
+
+            print(f"[SYNTH] Executing: {tool_name}({json.dumps(args, ensure_ascii=False)[:100]})", flush=True)
+
+            # Execute: MCP tool or local tool
+            if tool_name in mcp_tool_map:
+                from mcp.client import call_mcp_tool
+                result = call_mcp_tool(tool_name, args, mcp_tool_map)
+            else:
+                from agent.tools import execute_tool
+                result = execute_tool(tool_name, args)
+
+            print(f"[SYNTH] Result: {str(result)[:200]}", flush=True)
+
+            # Add tool result to messages
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc["id"],
+                "content": str(result)[:4000]
+            })
+
+        # Continue loop — LLM will process tool results
+    else:
+        answer = response.text if response else "Tool call limit reached."
+
     cache_mgr.set_semantic(state["input_text"], answer)
     return {
-        "final_answer":answer,
-        "messages":[{"role":"user","content":state["input_text"]},
-                    {"role":"assistant","content":answer}],
-        "iterations":state.get("iterations",0)+1,
+        "final_answer": answer,
+        "messages": [{"role": "user", "content": state["input_text"]},
+                     {"role": "assistant", "content": answer}],
+        "iterations": state.get("iterations", 0) + 1,
     }
 
 def index_node(state: AgentState) -> dict:
