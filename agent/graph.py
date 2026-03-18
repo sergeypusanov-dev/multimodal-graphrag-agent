@@ -251,7 +251,12 @@ def synthesize_node(state: AgentState) -> dict:
     _log_activity(session_id, "answer", specialist=specialist_name,
                   tool_result=answer[:500], duration_ms=total_ms)
 
-    cache_mgr.set_semantic(state["input_text"], answer)
+    # Don't cache error responses or tool-call answers (they contain real-time data)
+    error_markers = ["ошибк", "error", "не удалось", "failed", "извинит"]
+    is_error = any(m in answer.lower() for m in error_markers)
+    has_tools = bool(mcp_tool_map)
+    if not is_error and not has_tools:
+        cache_mgr.set_semantic(state["input_text"], answer)
     return {
         "final_answer": answer,
         "messages": [{"role": "user", "content": state["input_text"]},
