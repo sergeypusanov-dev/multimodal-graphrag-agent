@@ -42,35 +42,47 @@ SPECIALISTS = {
             "наценк", "маржа", "margin",
         ],
     },
-    "stock_logistics": {
-        "name": "WB Stock & Logistics",
-        "description": "Склад и логистика — остатки, поставки, заказы FBS, перемещения",
+    "orders": {
+        "name": "WB Orders",
+        "description": "Заказы и продажи — история заказов, продажи, возвраты, FBS сборка",
         "system_prompt": (
-            "You are a Wildberries stock and logistics specialist. "
-            "Monitor warehouse stocks, manage FBS orders, track supplies. "
-            "Flag low-stock products. Answer in the user's language."
+            "You are a Wildberries orders specialist. "
+            "Retrieve orders, sales, returns data. Manage FBS assembly orders. "
+            "Always use tools to get real data. Answer in the user's language."
+        ),
+        "tool_patterns": [
+            "wb_get_orders", "wb_get_sales", "wb_get_incomes",
+            "wb_get_last_order", "wb_get_new_orders", "wb_get_fbs_orders",
+            "wb_get_order_statuses", "wb_cancel_order", "wb_get_order_stickers",
+            "wb_get_reshipment_orders", "wb_get_returns_report",
+        ],
+        "keywords": [
+            "заказ", "продаж", "order", "sales", "возврат", "return",
+            "FBS", "сборк", "стикер", "отмен", "cancel",
+        ],
+    },
+    "warehouse": {
+        "name": "WB Warehouse",
+        "description": "Склад и поставки — остатки, склады, поставки, хранение, штрафы",
+        "system_prompt": (
+            "You are a Wildberries warehouse and supply specialist. "
+            "Monitor stocks, manage supplies, track storage costs. "
+            "Always use tools to get real data. Answer in the user's language."
         ),
         "tool_patterns": [
             "wb_stocks_report_groups", "wb_stocks_report_products",
             "wb_stocks_report_warehouses", "wb_get_warehouse_stocks",
-            "wb_get_new_orders", "wb_get_fbs_orders", "wb_get_order_statuses",
-            "wb_cancel_order", "wb_get_order_stickers",
             "wb_create_supply", "wb_get_supplies", "wb_get_supply",
             "wb_add_orders_to_supply", "wb_deliver_supply", "wb_delete_supply",
-            "wb_get_reshipment_orders",
             "wb_create_warehouse_report", "wb_warehouse_report_status",
             "wb_download_warehouse_report",
-            "wb_get_paid_storage",
-            "wb_get_orders", "wb_get_sales", "wb_get_incomes",
-            "wb_get_last_order",
+            "wb_get_paid_storage", "wb_get_measurement_penalties",
             "wb_get_blocked_products", "wb_get_shadowed_products",
-            "wb_get_returns_report", "wb_get_measurement_penalties",
         ],
         "keywords": [
-            "склад", "остаток", "заказ", "поставк", "FBS", "сборк",
-            "отгрузк", "стикер", "возврат", "хранени", "штраф",
-            "stock", "warehouse", "order", "supply", "logistics",
-            "blocked", "shadow",
+            "склад", "остаток", "поставк", "хранени", "штраф",
+            "stock", "warehouse", "supply", "logistics",
+            "blocked", "shadow", "storage",
         ],
     },
     "content": {
