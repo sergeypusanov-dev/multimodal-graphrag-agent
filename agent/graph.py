@@ -121,16 +121,33 @@ def build_system_prompt() -> str:
 
     return "\n\n".join(parts)
 
+def _log_activity(session_id, step, specialist=None, tool_name=None, tool_args=None, tool_result=None, duration_ms=None):
+    """Log activity to PostgreSQL for admin dashboard."""
+    try:
+        from database import get_db
+        db = get_db()
+        db.execute("""INSERT INTO activity_log (session_id, step, specialist, tool_name, tool_args, tool_result, duration_ms)
+                      VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                   [session_id, step, specialist,
+                    tool_name, str(tool_args)[:500] if tool_args else None,
+                    str(tool_result)[:1000] if tool_result else None, duration_ms])
+    except Exception:
+        pass
+
+
 def synthesize_node(state: AgentState) -> dict:
     from llm.adapter import main_llm
     from security.middleware import llm_circuit
     from cache.manager import cache_mgr
-    import json, logging
+    import json, logging, time
 
+    session_id = state.get("session_id", "")
     images = [m["data"] for m in state.get("media_context",[]) if m.get("type")=="image"]
     system = build_system_prompt()
     user_text = (f"Knowledge graph context:\n{state.get('graph_context','No context.')}\n\n"
                  f"Query: {state['input_text']}")
+
+    t0 = time.time()
 
     # ─── Orchestrator: route to specialist ───
     from agent.orchestrator import (classify_specialist, get_specialist_tools,
@@ -151,6 +168,8 @@ def synthesize_node(state: AgentState) -> dict:
     specialist_name = get_specialist_name(specialist)
 
     print(f"[ORCH] Specialist: {specialist_name} ({specialist}), tools: {len(all_tools or [])}", flush=True)
+    _log_activity(session_id, "route", specialist=specialist_name,
+                  tool_args={"query": state["input_text"][:200], "tools_count": len(all_tools or [])})
 
     # Build system prompt: base rules + specialist persona
     if specialist_prompt:
@@ -204,14 +223,18 @@ def synthesize_node(state: AgentState) -> dict:
             print(f"[SYNTH] Executing: {tool_name}({json.dumps(args, ensure_ascii=False)[:100]})", flush=True)
 
             # Execute: MCP tool or local tool
+            tc_start = time.time()
             if tool_name in mcp_tool_map:
                 from mcp.client import call_mcp_tool
                 result = call_mcp_tool(tool_name, args, mcp_tool_map)
             else:
                 from agent.tools import execute_tool
                 result = execute_tool(tool_name, args)
+            tc_ms = int((time.time() - tc_start) * 1000)
 
             print(f"[SYNTH] Result: {str(result)[:200]}", flush=True)
+            _log_activity(session_id, "tool_call", specialist=specialist_name,
+                          tool_name=tool_name, tool_args=args, tool_result=result, duration_ms=tc_ms)
 
             # Add tool result to messages
             messages.append({
@@ -223,6 +246,10 @@ def synthesize_node(state: AgentState) -> dict:
         # Continue loop — LLM will process tool results
     else:
         answer = response.text if response else "Tool call limit reached."
+
+    total_ms = int((time.time() - t0) * 1000)
+    _log_activity(session_id, "answer", specialist=specialist_name,
+                  tool_result=answer[:500], duration_ms=total_ms)
 
     cache_mgr.set_semantic(state["input_text"], answer)
     return {

@@ -132,6 +132,30 @@ async def preview_system_prompt():
     from agent.graph import build_system_prompt
     return {"prompt": build_system_prompt()}
 
+@app.get("/admin/activity")
+async def get_activity_log(limit: int = 50, session_id: Optional[str] = None):
+    from database import get_db
+    db = get_db()
+    where = "WHERE session_id=%s" if session_id else ""
+    params = ([session_id, limit] if session_id else [limit])
+    rows = db.fetch(f"""SELECT id, session_id, step, specialist, tool_name, tool_args,
+                               tool_result, duration_ms, created_at
+                        FROM activity_log {where}
+                        ORDER BY created_at DESC LIMIT %s""", params)
+    for r in rows:
+        for k in ("id", "created_at"):
+            if r.get(k): r[k] = str(r[k])
+    return {"entries": rows}
+
+@app.delete("/admin/activity")
+async def clear_activity_log(
+    auth=Depends(__import__("security.middleware",fromlist=["verify_auth"]).verify_auth)
+):
+    from database import get_db
+    db = get_db()
+    db.execute("DELETE FROM activity_log")
+    return {"status": "ok"}
+
 @app.get("/kb/stats")
 async def kb_stats():
     from database import get_db

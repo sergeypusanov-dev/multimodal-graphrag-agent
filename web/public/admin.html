@@ -48,6 +48,7 @@
         <a href="#" class="tab-link" data-tab="kb">Knowledge Base</a>
         <a href="#" class="tab-link" data-tab="agent">Agent</a>
         <a href="#" class="tab-link" data-tab="mcp">MCP Tools</a>
+        <a href="#" class="tab-link" data-tab="activity">Activity</a>
         <a href="#" class="tab-link" data-tab="system">System</a>
         <a href="/" style="margin-left:auto;font-size:13px">Chat UI</a>
     </nav>
@@ -180,6 +181,23 @@
             <div id="mcpServersList"></div>
             <div id="mcpEmpty" class="card" style="text-align:center;color:var(--text-muted);padding:40px">
                 No MCP servers configured. Add one above to extend the agent's capabilities.
+            </div>
+        </div>
+
+        <!-- ═══ Activity Log ═══ -->
+        <div class="tab" id="tab-activity">
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <div class="section-title" style="margin-bottom:0;padding-bottom:0;border:none">Activity Log</div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-sm btn-secondary" id="activityRefresh">Refresh</button>
+                        <button class="btn btn-sm btn-danger" id="activityClear">Clear Log</button>
+                    </div>
+                </div>
+                <div id="activityLog"></div>
+                <div id="activityEmpty" style="padding:40px;text-align:center;color:var(--text-muted)">
+                    No activity recorded yet. Send a message in the chat to see the agent's workflow.
+                </div>
             </div>
         </div>
 
@@ -438,12 +456,96 @@
             }).catch(function(e) { document.getElementById('promptPreview').textContent = 'Error: ' + e.message; });
         };
 
+        // ─── Activity Log ────────────────────────
+        var stepIcons = {route:'&#x1f9ed;',tool_call:'&#x1f527;',answer:'&#x1f4ac;'};
+        var stepColors = {route:'var(--primary)',tool_call:'#f59e0b',answer:'var(--success)'};
+
+        function loadActivity() {
+            apiJson('/admin/activity?limit=50').then(function(d) {
+                var el = document.getElementById('activityLog');
+                var empty = document.getElementById('activityEmpty');
+                el.innerHTML = '';
+                if (!d.entries.length) { empty.style.display = 'block'; return; }
+                empty.style.display = 'none';
+
+                // Group by session
+                var sessions = {};
+                d.entries.forEach(function(e) {
+                    var sid = e.session_id || 'unknown';
+                    if (!sessions[sid]) sessions[sid] = [];
+                    sessions[sid].push(e);
+                });
+
+                Object.keys(sessions).forEach(function(sid) {
+                    var entries = sessions[sid].reverse(); // chronological
+                    var group = document.createElement('div');
+                    group.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden';
+
+                    // Header
+                    var header = document.createElement('div');
+                    header.style.cssText = 'padding:10px 16px;background:#f8f9fa;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer';
+                    var routeEntry = entries.find(function(e) { return e.step === 'route'; });
+                    var answerEntry = entries.find(function(e) { return e.step === 'answer'; });
+                    var query = '';
+                    try { query = JSON.parse(routeEntry.tool_args || '{}').query || ''; } catch(ex) {}
+                    var specialist = routeEntry ? routeEntry.specialist : '?';
+                    var totalMs = answerEntry ? answerEntry.duration_ms : 0;
+                    var ts = entries[0].created_at || '';
+
+                    header.innerHTML = '<div><span style="font-size:12px;color:var(--text-muted)">' + ts.slice(0,19) + '</span>'
+                        + ' <strong style="font-size:14px">' + (query || sid.slice(0,8)) + '</strong></div>'
+                        + '<div><span class="badge badge-info">' + specialist + '</span>'
+                        + (totalMs ? ' <span style="font-size:12px;color:var(--text-muted)">' + (totalMs/1000).toFixed(1) + 's</span>' : '')
+                        + '</div>';
+                    group.appendChild(header);
+
+                    // Timeline
+                    var timeline = document.createElement('div');
+                    timeline.style.cssText = 'padding:12px 16px;display:none';
+                    header.onclick = function() { timeline.style.display = timeline.style.display === 'none' ? 'block' : 'none'; };
+
+                    entries.forEach(function(e) {
+                        var row = document.createElement('div');
+                        row.style.cssText = 'display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px';
+                        var icon = stepIcons[e.step] || '&#x2022;';
+                        var color = stepColors[e.step] || 'var(--text-muted)';
+                        var detail = '';
+
+                        if (e.step === 'route') {
+                            detail = 'Routed to <strong>' + e.specialist + '</strong>';
+                            try { var a = JSON.parse(e.tool_args||'{}'); detail += ' (' + (a.tools_count||0) + ' tools)'; } catch(ex) {}
+                        } else if (e.step === 'tool_call') {
+                            detail = 'Called <strong style="color:#f59e0b">' + (e.tool_name||'?') + '</strong>';
+                            if (e.tool_args) detail += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Args: ' + String(e.tool_args).slice(0,150) + '</div>';
+                            if (e.tool_result) detail += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Result: ' + String(e.tool_result).slice(0,200) + '</div>';
+                        } else if (e.step === 'answer') {
+                            detail = '<div style="max-width:600px">' + (e.tool_result || '').slice(0,200) + '</div>';
+                        }
+
+                        row.innerHTML = '<div style="flex-shrink:0;width:24px;text-align:center;color:' + color + '">' + icon + '</div>'
+                            + '<div style="flex-shrink:0;width:70px;color:' + color + ';font-weight:600;font-size:12px;text-transform:uppercase">' + e.step + '</div>'
+                            + '<div style="flex:1">' + detail + '</div>'
+                            + '<div style="flex-shrink:0;font-size:11px;color:var(--text-muted)">' + (e.duration_ms ? e.duration_ms + 'ms' : '') + '</div>';
+                        timeline.appendChild(row);
+                    });
+
+                    group.appendChild(timeline);
+                    el.appendChild(group);
+                });
+            }).catch(function(){});
+        }
+
+        document.getElementById('activityRefresh').onclick = loadActivity;
+        document.getElementById('activityClear').onclick = function() {
+            apiDelete('/admin/activity').then(function() { showToast('Log cleared'); loadActivity(); });
+        };
+
         // ─── Config ──────────────────────────────
         function loadConfig() { apiJson('/.well-known/agent.json').then(function(c){return apiJson('/kb/stats').then(function(s){document.getElementById('configInfo').innerHTML='<div><strong>Agent:</strong> '+c.name+' v'+c.version+'</div><div><strong>Skills:</strong> '+(c.skills?c.skills.length:0)+'</div><div><strong>KB:</strong> '+s.entities+' entities, '+s.relationships+' rels, '+s.chunks+' chunks</div><div><strong>Input:</strong> '+(c.defaultInputModes||[]).join(', ')+'</div>';});}).catch(function(){}); }
 
         // ─── Init ────────────────────────────────
         loadStats(); loadHealth(); loadAgentInfo(); loadMetrics(); loadFiles(); loadEntities();
-        loadConfig(); loadAgentSettings(); loadRules(); loadMcpServers(); loadSpecialists();
+        loadConfig(); loadAgentSettings(); loadRules(); loadMcpServers(); loadSpecialists(); loadActivity();
         setInterval(function() { loadStats(); loadHealth(); loadMetrics(); }, 15000);
     </script>
 </body>

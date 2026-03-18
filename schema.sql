@@ -127,6 +127,23 @@ CREATE TABLE IF NOT EXISTS agent_rules (
 -- ═══════════════════════════════════════════════════════
 -- MCP TOOLS
 -- ═══════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════
+-- ACTIVITY LOG
+-- ═══════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS activity_log (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id  TEXT,
+    step        TEXT NOT NULL,
+    specialist  TEXT,
+    tool_name   TEXT,
+    tool_args   TEXT,
+    tool_result TEXT,
+    duration_ms INT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_activity_log_created ON activity_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_log_session ON activity_log (session_id);
+
 CREATE TABLE IF NOT EXISTS mcp_servers (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name        TEXT NOT NULL UNIQUE,
