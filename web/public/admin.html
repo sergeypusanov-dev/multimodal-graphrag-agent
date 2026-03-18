@@ -107,6 +107,31 @@
 
         <!-- ═══ Agent Settings & Rules ═══ -->
         <div class="tab" id="tab-agent">
+            <!-- Specialists -->
+            <div class="card" style="margin-bottom:16px">
+                <div class="section-title">Specialist Agents (Orchestrator)</div>
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+                    Queries are automatically routed to the best specialist based on keywords.
+                </p>
+                <div class="search-row" style="margin-bottom:16px">
+                    <input class="form-input" id="routeTestInput" placeholder="Enter a query to test routing..." style="flex:1">
+                    <button class="btn btn-primary" id="routeTestBtn">Test Routing</button>
+                </div>
+                <div id="routeTestResult" style="margin-bottom:16px"></div>
+                <div id="specialistsList"></div>
+            </div>
+
+            <!-- Prompt Preview -->
+            <div class="card" style="margin-bottom:16px">
+                <div class="section-title">System Prompt Preview</div>
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
+                    The actual prompt sent to LLM, combining settings + rules + specialist prompt.
+                </p>
+                <button class="btn btn-sm btn-secondary" id="previewPromptBtn" style="margin-bottom:8px">Refresh Preview</button>
+                <pre id="promptPreview" style="background:#f8f9fa;padding:12px;border-radius:var(--radius);font-size:12px;line-height:1.5;max-height:300px;overflow-y:auto;white-space:pre-wrap;border:1px solid var(--border)">Click "Refresh Preview" to load...</pre>
+            </div>
+
+            <!-- Settings + Rules -->
             <div class="grid-2">
                 <div class="card">
                     <div class="section-title">Agent Settings</div>
@@ -357,12 +382,68 @@
             .catch(function(e) { st.innerHTML = '<span style="color:var(--danger)">Failed: ' + e.message + '</span>'; });
         };
 
+        // ─── Specialists ─────────────────────────
+        var specialistColors = {analytics:'#3b82f6',pricing:'#f59e0b',stock_logistics:'#22c55e',content:'#8b5cf6',finance:'#ef4444'};
+        function loadSpecialists() {
+            apiJson('/admin/specialists').then(function(d) {
+                var el = document.getElementById('specialistsList');
+                el.innerHTML = '';
+                var grid = document.createElement('div');
+                grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px';
+                d.specialists.forEach(function(s) {
+                    var color = specialistColors[s.key] || '#6b7280';
+                    var card = document.createElement('div');
+                    card.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius);padding:16px;border-left:4px solid '+color;
+                    card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+                        + '<strong style="font-size:15px">'+s.name+'</strong>'
+                        + '<span class="badge badge-info">'+s.tools_count+' tools</span></div>'
+                        + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">'+s.description+'</div>'
+                        + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px"><strong>Keywords:</strong> '+s.keywords.join(', ')+'</div>'
+                        + '<details style="font-size:12px"><summary style="cursor:pointer;color:var(--primary)">Tools & Prompt</summary>'
+                        + '<div style="margin-top:8px;padding:8px;background:#f8f9fa;border-radius:4px">'
+                        + '<div style="margin-bottom:6px"><strong>Tools:</strong> '+s.tools.join(', ')+'</div>'
+                        + '<div><strong>Prompt:</strong> '+s.system_prompt+'</div></div></details>';
+                    grid.appendChild(card);
+                });
+                el.appendChild(grid);
+            }).catch(function(){});
+        }
+
+        // Route tester
+        document.getElementById('routeTestBtn').onclick = function() {
+            var q = document.getElementById('routeTestInput').value.trim();
+            if (!q) return;
+            apiPost('/admin/specialists/test', {query: q}).then(function(r) {
+                var color = specialistColors[r.selected] || '#6b7280';
+                var scoreHtml = Object.keys(r.scores).map(function(k) {
+                    var isSelected = k === r.selected;
+                    return '<span style="margin-right:12px;'+(isSelected?'font-weight:700;color:'+color:'')+'">'
+                        + k + ': ' + r.scores[k] + '</span>';
+                }).join('');
+                document.getElementById('routeTestResult').innerHTML =
+                    '<div class="card" style="border-left:4px solid '+color+';padding:12px">'
+                    + '<div style="margin-bottom:4px">Query: <strong>"'+r.query+'"</strong></div>'
+                    + '<div style="margin-bottom:4px">Routed to: <strong style="color:'+color+'">'+r.specialist_name+'</strong> ('+r.selected+')</div>'
+                    + '<div style="font-size:12px;color:var(--text-muted)">Scores: '+scoreHtml+'</div></div>';
+            });
+        };
+        document.getElementById('routeTestInput').onkeydown = function(e) {
+            if (e.key === 'Enter') document.getElementById('routeTestBtn').click();
+        };
+
+        // Prompt preview
+        document.getElementById('previewPromptBtn').onclick = function() {
+            apiJson('/admin/agent/prompt-preview').then(function(r) {
+                document.getElementById('promptPreview').textContent = r.prompt;
+            }).catch(function(e) { document.getElementById('promptPreview').textContent = 'Error: ' + e.message; });
+        };
+
         // ─── Config ──────────────────────────────
         function loadConfig() { apiJson('/.well-known/agent.json').then(function(c){return apiJson('/kb/stats').then(function(s){document.getElementById('configInfo').innerHTML='<div><strong>Agent:</strong> '+c.name+' v'+c.version+'</div><div><strong>Skills:</strong> '+(c.skills?c.skills.length:0)+'</div><div><strong>KB:</strong> '+s.entities+' entities, '+s.relationships+' rels, '+s.chunks+' chunks</div><div><strong>Input:</strong> '+(c.defaultInputModes||[]).join(', ')+'</div>';});}).catch(function(){}); }
 
         // ─── Init ────────────────────────────────
         loadStats(); loadHealth(); loadAgentInfo(); loadMetrics(); loadFiles(); loadEntities();
-        loadConfig(); loadAgentSettings(); loadRules(); loadMcpServers();
+        loadConfig(); loadAgentSettings(); loadRules(); loadMcpServers(); loadSpecialists();
         setInterval(function() { loadStats(); loadHealth(); loadMetrics(); }, 15000);
     </script>
 </body>

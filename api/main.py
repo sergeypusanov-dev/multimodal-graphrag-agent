@@ -104,9 +104,33 @@ async def get_specialists():
     from agent.orchestrator import SPECIALISTS
     return {"specialists": [
         {"key": k, "name": v["name"], "description": v["description"],
-         "tools_count": len(v["tool_patterns"]), "keywords_sample": v["keywords"][:5]}
+         "tools_count": len(v["tool_patterns"]),
+         "tools": v["tool_patterns"],
+         "keywords": v["keywords"],
+         "system_prompt": v["system_prompt"]}
         for k, v in SPECIALISTS.items()
     ]}
+
+@app.post("/admin/specialists/test")
+async def test_specialist_routing(req: dict):
+    from agent.orchestrator import classify_specialist, get_specialist_name, SPECIALISTS
+    query = req.get("query", "")
+    key = classify_specialist(query)
+    scores = {}
+    query_lower = query.lower()
+    for k, spec in SPECIALISTS.items():
+        scores[k] = sum(2 for kw in spec["keywords"] if kw in query_lower)
+    return {
+        "query": query,
+        "selected": key,
+        "specialist_name": get_specialist_name(key),
+        "scores": scores
+    }
+
+@app.get("/admin/agent/prompt-preview")
+async def preview_system_prompt():
+    from agent.graph import build_system_prompt
+    return {"prompt": build_system_prompt()}
 
 @app.get("/kb/stats")
 async def kb_stats():
